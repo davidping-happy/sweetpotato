@@ -2,6 +2,8 @@
  * 磐石烤地瓜 — 商品初始資料
  * 依據實際攤位照片標示的價格
  */
+const IMAGE_CDN_BASE = 'https://cdn.jsdelivr.net/gh/davidping-happy/sweetpotato@main/';
+
 const seedProducts = [
   {
     name: '台農57號黃金地瓜',
@@ -9,7 +11,7 @@ const seedProducts = [
     price: 120,
     category: '烤地瓜',
     inStock: true,
-    imageUrl: '/photo/002.jpg',
+    imageUrl: `${IMAGE_CDN_BASE}photo/002.jpg`,
   },
   {
     name: '手作地瓜糖/酥（小盒）',
@@ -17,7 +19,7 @@ const seedProducts = [
     price: 40,
     category: '零食',
     inStock: true,
-    imageUrl: '/photo/005.png',
+    imageUrl: `${IMAGE_CDN_BASE}photo/005.png`,
   },
   {
     name: '古早味茶葉蛋',
@@ -25,7 +27,7 @@ const seedProducts = [
     price: 10,
     category: '蛋',
     inStock: true,
-    imageUrl: '/photo/004.png',
+    imageUrl: `${IMAGE_CDN_BASE}photo/004.png`,
   },
 ];
 

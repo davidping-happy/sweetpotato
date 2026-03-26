@@ -6,6 +6,13 @@ import {
 import './App.css';
 
 const API_BASE = 'http://localhost:3000';
+const IMAGE_CDN_BASE = 'https://cdn.jsdelivr.net/gh/davidping-happy/sweetpotato@main/';
+
+const toCdnImageUrl = (url) => {
+  if (!url || typeof url !== 'string') return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  return `${IMAGE_CDN_BASE}${url.replace(/^\/+/, '')}`;
+};
 
 /* ============================================================
    Toast Component
@@ -25,9 +32,9 @@ function Toast({ message, visible }) {
 export default function App() {
   // ---------- Products ----------
   const fallbackProducts = [
-    { _id: 'local-1', name: '台農57號黃金地瓜', description: '嚴選在地優質地瓜，炭火慢烤，糖蜜流溢，肉質鬆軟綿密。（每顆）', price: 120, category: '烤地瓜', imageUrl: '/photo/002.jpg', badge: '熱銷首選' },
-    { _id: 'local-2', name: '手作地瓜糖/酥（小盒）', description: '酥脆地瓜片與蜜地瓜，把家鄉的溫暖帶走，追劇旅遊的最佳良伴。（小盒40/大盒60）', price: 40, category: '零食', imageUrl: '/photo/005.png' },
-    { _id: 'local-3', name: '古早味茶葉蛋', description: '慢熬24小時，五香漢方藥材入味，每一口都透著溫潤香氣。（每顆）', price: 10, category: '蛋', imageUrl: '/photo/004.png' },
+    { _id: 'local-1', name: '台農57號黃金地瓜', description: '嚴選在地優質地瓜，炭火慢烤，糖蜜流溢，肉質鬆軟綿密。（每顆）', price: 120, category: '烤地瓜', imageUrl: `${IMAGE_CDN_BASE}photo/002.jpg`, badge: '熱銷首選' },
+    { _id: 'local-2', name: '手作地瓜糖/酥（小盒）', description: '酥脆地瓜片與蜜地瓜，把家鄉的溫暖帶走，追劇旅遊的最佳良伴。（小盒40/大盒60）', price: 40, category: '零食', imageUrl: `${IMAGE_CDN_BASE}photo/005.png` },
+    { _id: 'local-3', name: '古早味茶葉蛋', description: '慢熬24小時，五香漢方藥材入味，每一口都透著溫潤香氣。（每顆）', price: 10, category: '蛋', imageUrl: `${IMAGE_CDN_BASE}photo/004.png` },
   ];
 
   const [products, setProducts] = useState(fallbackProducts);
@@ -40,7 +47,7 @@ export default function App() {
         if (json.success && json.data.length > 0) {
           // keep badges from fallback
           const badgeMap = { '台農57號黃金地瓜': '熱銷首選' };
-          setProducts(json.data.map(p => ({ ...p, badge: badgeMap[p.name] })));
+          setProducts(json.data.map(p => ({ ...p, imageUrl: toCdnImageUrl(p.imageUrl), badge: badgeMap[p.name] })));
           setApiReady(true);
         }
       })
@@ -187,7 +194,7 @@ export default function App() {
       {/* ======= Hero ======= */}
       <section className="hero" id="hero">
         <div className="hero-bg">
-          <img src="/photo/001.webp" alt="磐石烤地瓜攤位" />
+          <img src={`${IMAGE_CDN_BASE}photo/001.webp`} alt="磐石烤地瓜攤位" />
           <div className="hero-overlay" />
         </div>
         <div className="hero-content">
@@ -235,7 +242,7 @@ export default function App() {
       <section className="story-section" id="story">
         <div className="story-inner">
           <div className="story-img-wrapper">
-            <img src="/photo/003.png" alt="窯烤地瓜" />
+            <img src={`${IMAGE_CDN_BASE}photo/003.png`} alt="窯烤地瓜" />
             <div className="story-badge">
               <div className="number">20+</div>
               <div className="text">Years of Tradition</div>
