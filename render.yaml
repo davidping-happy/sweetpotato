@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: sweetpotato-api
+    runtime: node
+    rootDir: server
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Optional: set this in Render dashboard if using MongoDB Atlas
+      # - key: MONGODB_URI
+      #   value: mongodb+srv://<username>:<password>@<cluster>/<db>
