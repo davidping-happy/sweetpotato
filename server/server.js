@@ -29,8 +29,8 @@ app.locals.db = {
 app.use(cors());
 app.use(express.json());
 
-// 靜態檔案：提供前端頁面與圖片
-app.use(express.static(path.join(__dirname, '..')));
+// 靜態檔案：統一使用 docs 作為唯一前台來源
+app.use(express.static(path.join(__dirname, '..', 'docs')));
 
 // ============ API 路由 ============
 app.use('/api/products', productsRouter);

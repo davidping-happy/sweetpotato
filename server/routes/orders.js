@@ -27,6 +27,214 @@ function calculateShipping(subtotal) {
   return subtotal >= 1000 ? 0 : 150;
 }
 
+function formatOrderForList(order) {
+  const latestHistory = Array.isArray(order.statusHistory) && order.statusHistory.length > 0
+    ? order.statusHistory[order.statusHistory.length - 1]
+    : null;
+  return {
+    orderNumber: order.orderNumber,
+    status: order.status,
+    customer: order.customer,
+    itemsCount: Array.isArray(order.items)
+      ? order.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
+      : 0,
+    subtotal: order.subtotal,
+    shipping: order.shipping,
+    total: order.total,
+    createdAt: order.createdAt,
+    lastStatusBy: latestHistory?.changedBy || '-',
+    lastStatusAt: latestHistory?.changedAt || order.createdAt,
+  };
+}
+
+function formatOrderDetail(order) {
+  return {
+    orderNumber: order.orderNumber,
+    status: order.status,
+    customer: order.customer,
+    items: order.items,
+    subtotal: order.subtotal,
+    shipping: order.shipping,
+    total: order.total,
+    createdAt: order.createdAt,
+    statusHistory: order.statusHistory || [],
+  };
+}
+
+const ALLOWED_STATUSES = ['pending', 'confirmed', 'shipped', 'completed', 'cancelled'];
+const STATUS_TRANSITIONS = {
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['shipped', 'cancelled'],
+  shipped: ['completed'],
+  completed: [],
+  cancelled: [],
+};
+
+// ============ GET /api/orders ============
+// 簡易後台查詢：支援 MongoDB 與 in-memory fallback 兩種模式
+router.get('/', async (req, res) => {
+  try {
+    const limitRaw = Number(req.query.limit);
+    const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 200) : 50;
+
+    if (req.app.locals.db?.ready) {
+      const orders = await Order.find({})
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .lean();
+
+      return res.json({
+        success: true,
+        source: 'mongodb',
+        count: orders.length,
+        data: orders.map(formatOrderForList),
+      });
+    }
+
+    const fallbackOrders = req.app.locals.db?.fallbackOrders || [];
+    const sorted = [...fallbackOrders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, limit);
+    return res.json({
+      success: true,
+      source: 'memory',
+      count: sorted.length,
+      data: sorted.map(formatOrderForList),
+    });
+  } catch (err) {
+    console.error('查詢訂單失敗:', err);
+    return res.status(500).json({ success: false, message: '查詢訂單失敗' });
+  }
+});
+
+// ============ GET /api/orders/:orderNumber ============
+router.get('/:orderNumber', async (req, res) => {
+  try {
+    const orderNumber = String(req.params.orderNumber || '').trim();
+    if (!orderNumber) {
+      return res.status(400).json({ success: false, message: '請提供有效的訂單編號' });
+    }
+
+    if (req.app.locals.db?.ready) {
+      const order = await Order.findOne({ orderNumber }).lean();
+      if (!order) {
+        return res.status(404).json({ success: false, message: '查無此訂單' });
+      }
+      return res.json({ success: true, source: 'mongodb', data: formatOrderDetail(order) });
+    }
+
+    const fallbackOrders = req.app.locals.db?.fallbackOrders || [];
+    const order = fallbackOrders.find((o) => o.orderNumber === orderNumber);
+    if (!order) {
+      return res.status(404).json({ success: false, message: '查無此訂單' });
+    }
+    return res.json({ success: true, source: 'memory', data: formatOrderDetail(order) });
+  } catch (err) {
+    console.error('查詢單筆訂單失敗:', err);
+    return res.status(500).json({ success: false, message: '查詢單筆訂單失敗' });
+  }
+});
+
+// ============ PATCH /api/orders/:orderNumber/status ============
+router.patch('/:orderNumber/status', async (req, res) => {
+  try {
+    const orderNumber = String(req.params.orderNumber || '').trim();
+    const status = String(req.body?.status || '').trim();
+    const changedBy = String(req.body?.changedBy || 'admin').trim() || 'admin';
+
+    if (!orderNumber) {
+      return res.status(400).json({ success: false, message: '請提供有效的訂單編號' });
+    }
+    if (!ALLOWED_STATUSES.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `狀態不合法，僅支援：${ALLOWED_STATUSES.join(', ')}`,
+      });
+    }
+
+    if (req.app.locals.db?.ready) {
+      const existing = await Order.findOne({ orderNumber }).lean();
+      if (!existing) {
+        return res.status(404).json({ success: false, message: '查無此訂單' });
+      }
+      const currentStatus = existing.status;
+      if (currentStatus === status) {
+        return res.json({
+          success: true,
+          source: 'mongodb',
+          message: `訂單 ${orderNumber} 狀態維持 ${status}`,
+          data: formatOrderDetail(existing),
+        });
+      }
+
+      const allowedNext = STATUS_TRANSITIONS[currentStatus] || [];
+      if (!allowedNext.includes(status)) {
+        return res.status(400).json({
+          success: false,
+          message: `不允許狀態回退：${currentStatus} -> ${status}。可更新為：${allowedNext.join(', ') || '無'}`,
+        });
+      }
+
+      const historyEntry = {
+        from: currentStatus,
+        to: status,
+        changedBy,
+        changedAt: new Date(),
+      };
+      const updated = await Order.findOneAndUpdate(
+        { orderNumber },
+        { status, $push: { statusHistory: historyEntry } },
+        { new: true },
+      ).lean();
+      return res.json({
+        success: true,
+        source: 'mongodb',
+        message: `訂單 ${orderNumber} 狀態已更新為 ${status}`,
+        data: formatOrderDetail(updated),
+      });
+    }
+
+    const fallbackOrders = req.app.locals.db?.fallbackOrders || [];
+    const target = fallbackOrders.find((o) => o.orderNumber === orderNumber);
+    if (!target) {
+      return res.status(404).json({ success: false, message: '查無此訂單' });
+    }
+    const currentStatus = target.status;
+    if (currentStatus === status) {
+      return res.json({
+        success: true,
+        source: 'memory',
+        message: `訂單 ${orderNumber} 狀態維持 ${status}`,
+        data: formatOrderDetail(target),
+      });
+    }
+    const allowedNext = STATUS_TRANSITIONS[currentStatus] || [];
+    if (!allowedNext.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        message: `不允許狀態回退：${currentStatus} -> ${status}。可更新為：${allowedNext.join(', ') || '無'}`,
+      });
+    }
+    target.status = status;
+    if (!Array.isArray(target.statusHistory)) {
+      target.statusHistory = [];
+    }
+    target.statusHistory.push({
+      from: currentStatus,
+      to: status,
+      changedBy,
+      changedAt: new Date(),
+    });
+    return res.json({
+      success: true,
+      source: 'memory',
+      message: `訂單 ${orderNumber} 狀態已更新為 ${status}`,
+      data: formatOrderDetail(target),
+    });
+  } catch (err) {
+    console.error('更新訂單狀態失敗:', err);
+    return res.status(500).json({ success: false, message: '更新訂單狀態失敗' });
+  }
+});
+
 // ============ POST /api/orders ============
 
 router.post('/', async (req, res) => {
@@ -192,6 +400,12 @@ router.post('/', async (req, res) => {
           address: customer.address,
         },
         status: 'pending',
+        statusHistory: [{
+          from: 'created',
+          to: 'pending',
+          changedBy: 'system',
+          changedAt: new Date(),
+        }],
       });
     } else {
       order = {
@@ -207,6 +421,12 @@ router.post('/', async (req, res) => {
           address: customer.address,
         },
         status: 'pending',
+        statusHistory: [{
+          from: 'created',
+          to: 'pending',
+          changedBy: 'system',
+          changedAt: new Date(),
+        }],
         createdAt: new Date(),
       };
       req.app.locals.db.fallbackOrders.push(order);

@@ -21,6 +21,29 @@ const orderItemSchema = new mongoose.Schema({
   },
 }, { _id: false });
 
+const statusHistorySchema = new mongoose.Schema({
+  from: {
+    type: String,
+    enum: ['pending', 'confirmed', 'shipped', 'completed', 'cancelled', 'created'],
+    required: true,
+  },
+  to: {
+    type: String,
+    enum: ['pending', 'confirmed', 'shipped', 'completed', 'cancelled'],
+    required: true,
+  },
+  changedBy: {
+    type: String,
+    required: true,
+    trim: true,
+  },
+  changedAt: {
+    type: Date,
+    required: true,
+    default: Date.now,
+  },
+}, { _id: false });
+
 const orderSchema = new mongoose.Schema({
   orderNumber: {
     type: String,
@@ -60,6 +83,10 @@ const orderSchema = new mongoose.Schema({
     type: String,
     enum: ['pending', 'confirmed', 'shipped', 'completed', 'cancelled'],
     default: 'pending',
+  },
+  statusHistory: {
+    type: [statusHistorySchema],
+    default: [],
   },
 }, {
   timestamps: true,

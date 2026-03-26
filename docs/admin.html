@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>磐石烤地瓜 - 訂單後台</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; background: #fff9e6; color: #3a2e2a; }
+    .wrap { max-width: 1100px; margin: 24px auto; padding: 0 16px; }
+    h1 { margin: 0 0 16px; color: #f28c28; }
+    .card { background: #fff; border-radius: 12px; padding: 16px; box-shadow: 0 4px 16px rgba(0,0,0,.06); margin-bottom: 16px; }
+    .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    input, button, select { padding: 10px 12px; border-radius: 8px; border: 1px solid #ddd; font-size: 14px; }
+    button { background: #f28c28; color: #fff; border: none; cursor: pointer; }
+    button.secondary { background: #5d4037; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
+    th, td { padding: 10px 8px; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }
+    th { color: #5d4037; background: #fff5df; }
+    .muted { color: #777; font-size: 13px; }
+    .ok { color: #0f8a43; }
+    .err { color: #c62828; }
+    .detail-box { background: #f7f7f7; padding: 12px; border-radius: 8px; }
+    .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin-bottom: 12px; }
+    .timeline { list-style: none; margin: 0; padding: 0; }
+    .timeline-item { position: relative; padding-left: 18px; margin-bottom: 12px; }
+    .timeline-item:last-child { margin-bottom: 0; }
+    .timeline-item::before { content: ''; position: absolute; left: 0; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: #f28c28; }
+    .timeline-item::after { content: ''; position: absolute; left: 3px; top: 16px; width: 2px; height: calc(100% + 4px); background: #e5d7c0; }
+    .timeline-item:last-child::after { display: none; }
+    .timeline-title { font-weight: bold; color: #5d4037; }
+    .timeline-meta { color: #777; font-size: 12px; margin-top: 2px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>訂單後台</h1>
+
+    <div class="card">
+      <div class="row">
+        <button id="reloadBtn">重新載入訂單</button>
+        <input id="operatorInput" value="admin" placeholder="操作人（例如店長）" />
+        <input id="apiBaseInput" placeholder="API URL（例如 https://your-api.com）" style="min-width:320px;" />
+        <button id="saveApiBtn" class="secondary">儲存 API URL</button>
+        <button id="testApiBtn" class="secondary">測試連線</button>
+        <span id="status" class="muted">尚未載入</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>訂單編號</th>
+            <th>建立時間</th>
+            <th>顧客</th>
+            <th>件數</th>
+            <th>總金額</th>
+            <th>狀態</th>
+            <th>最近更新</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="ordersBody">
+          <tr><td colspan="8" class="muted">載入中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>查單筆訂單</h3>
+      <div class="row">
+        <input id="orderNumberInput" placeholder="輸入訂單編號，例如 PS-20260326-123" style="min-width:320px;" />
+        <button id="searchBtn" class="secondary">查詢</button>
+      </div>
+      <p id="searchStatus" class="muted"></p>
+      <div id="orderSummary" class="detail-box muted">尚未查詢</div>
+      <h4 style="margin: 12px 0 8px;">狀態變更時間軸</h4>
+      <ul id="orderTimeline" class="timeline">
+        <li class="muted">尚未查詢</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE_STORAGE_KEY = 'sweetpotato_admin_api_base';
+    const DEFAULT_API_BASE = window.location.origin.includes('localhost') ? 'http://localhost:3000' : '';
+    const ordersBody = document.getElementById('ordersBody');
+    const statusEl = document.getElementById('status');
+    const searchStatus = document.getElementById('searchStatus');
+    const orderSummary = document.getElementById('orderSummary');
+    const orderTimeline = document.getElementById('orderTimeline');
+    const operatorInput = document.getElementById('operatorInput');
+    const apiBaseInput = document.getElementById('apiBaseInput');
+    const statusTransitions = {
+      pending: ['pending', 'confirmed', 'cancelled'],
+      confirmed: ['confirmed', 'shipped', 'cancelled'],
+      shipped: ['shipped', 'completed'],
+      completed: ['completed'],
+      cancelled: ['cancelled'],
+    };
+
+    function fmtDate(iso) {
+      if (!iso) return '-';
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return iso;
+      return d.toLocaleString('zh-TW');
+    }
+
+    function normalizeApiBase(raw) {
+      const val = String(raw || '').trim().replace(/\/+$/, '');
+      if (!val) return '';
+      return val;
+    }
+
+    function getApiBase() {
+      const saved = localStorage.getItem(API_BASE_STORAGE_KEY);
+      return normalizeApiBase(saved || DEFAULT_API_BASE);
+    }
+
+    function apiUrl(path) {
+      const base = getApiBase();
+      const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+      return `${base}${normalizedPath}`;
+    }
+
+    function initApiBaseInput() {
+      apiBaseInput.value = getApiBase();
+    }
+
+    function saveApiBase() {
+      const normalized = normalizeApiBase(apiBaseInput.value);
+      localStorage.setItem(API_BASE_STORAGE_KEY, normalized);
+      apiBaseInput.value = normalized;
+      statusEl.className = 'ok';
+      statusEl.textContent = `已儲存 API URL：${normalized || '(空白)'}`;
+    }
+
+    async function testApiConnection() {
+      const base = getApiBase();
+      if (!base) {
+        statusEl.className = 'err';
+        statusEl.textContent = '請先輸入並儲存 API URL';
+        return;
+      }
+      statusEl.className = 'muted';
+      statusEl.textContent = `測試連線中：${base}/api/health`;
+      try {
+        const res = await fetch(apiUrl('/api/health'));
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          throw new Error(json.message || `HTTP ${res.status}`);
+        }
+        statusEl.className = 'ok';
+        statusEl.textContent = `連線成功：${base}/api/health（${json.status || 'ok'}）`;
+      } catch (err) {
+        statusEl.className = 'err';
+        statusEl.textContent = `連線失敗：${err.message}`;
+      }
+    }
+
+    function statusOptions(current) {
+      const allowed = statusTransitions[current] || [current];
+      return allowed.map(s => `<option value="${s}" ${s === current ? 'selected' : ''}>${s}</option>`).join('');
+    }
+
+    async function updateStatus(orderNumber) {
+      const select = document.getElementById(`status-${orderNumber}`);
+      const nextStatus = select ? select.value : '';
+      if (!nextStatus) return;
+      const changedBy = (operatorInput.value || '').trim() || 'admin';
+      statusEl.className = 'muted';
+      statusEl.textContent = `更新中：${orderNumber} -> ${nextStatus}（${changedBy}）`;
+
+      try {
+        const res = await fetch(apiUrl(`/api/orders/${encodeURIComponent(orderNumber)}/status`), {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: nextStatus, changedBy }),
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success) throw new Error(json.message || '更新失敗');
+
+        statusEl.className = 'ok';
+        statusEl.textContent = `更新成功：${orderNumber} -> ${nextStatus}（${changedBy}）`;
+        await loadOrders();
+      } catch (err) {
+        statusEl.className = 'err';
+        statusEl.textContent = `更新失敗：${err.message}`;
+      }
+    }
+
+    async function loadOrders() {
+      statusEl.className = 'muted';
+      statusEl.textContent = '載入中...';
+      try {
+        const res = await fetch(apiUrl('/api/orders?limit=100'));
+        const json = await res.json();
+        if (!res.ok || !json.success) throw new Error(json.message || '載入失敗');
+
+        const rows = (json.data || []).map(o => `
+          <tr>
+            <td>${o.orderNumber || '-'}</td>
+            <td>${fmtDate(o.createdAt)}</td>
+            <td>${o.customer?.name || '-'}<br><span class="muted">${o.customer?.phone || ''}</span></td>
+            <td>${o.itemsCount ?? '-'}</td>
+            <td>NT$${o.total ?? 0}</td>
+            <td>${o.status || '-'}</td>
+            <td>${o.lastStatusBy || '-'}<br><span class="muted">${fmtDate(o.lastStatusAt)}</span></td>
+            <td>
+              <div class="row">
+                <select id="status-${o.orderNumber}">
+                  ${statusOptions(o.status)}
+                </select>
+                <button class="secondary" onclick="updateStatus('${o.orderNumber}')">更新</button>
+              </div>
+            </td>
+          </tr>
+        `).join('');
+
+        ordersBody.innerHTML = rows || '<tr><td colspan="8" class="muted">目前沒有訂單</td></tr>';
+        statusEl.className = 'ok';
+        statusEl.textContent = `載入成功，共 ${json.count || 0} 筆（來源：${json.source || 'unknown'}）`;
+      } catch (err) {
+        ordersBody.innerHTML = '<tr><td colspan="8" class="err">載入失敗，請確認後端已啟動</td></tr>';
+        statusEl.className = 'err';
+        statusEl.textContent = `載入失敗：${err.message}`;
+      }
+    }
+
+    async function searchOrder() {
+      const orderNumber = document.getElementById('orderNumberInput').value.trim();
+      if (!orderNumber) {
+        searchStatus.className = 'err';
+        searchStatus.textContent = '請先輸入訂單編號';
+        return;
+      }
+      searchStatus.className = 'muted';
+      searchStatus.textContent = '查詢中...';
+
+      try {
+        const res = await fetch(apiUrl(`/api/orders/${encodeURIComponent(orderNumber)}`));
+        const json = await res.json();
+        if (!res.ok || !json.success) throw new Error(json.message || '查詢失敗');
+
+        const d = json.data || {};
+        orderSummary.className = 'detail-box';
+        orderSummary.innerHTML = `
+          <div class="detail-grid">
+            <div><strong>訂單編號：</strong>${d.orderNumber || '-'}</div>
+            <div><strong>目前狀態：</strong>${d.status || '-'}</div>
+            <div><strong>建立時間：</strong>${fmtDate(d.createdAt)}</div>
+            <div><strong>總金額：</strong>NT$${d.total ?? 0}</div>
+            <div><strong>顧客：</strong>${d.customer?.name || '-'}</div>
+            <div><strong>電話：</strong>${d.customer?.phone || '-'}</div>
+          </div>
+        `;
+
+        const history = Array.isArray(d.statusHistory) ? d.statusHistory : [];
+        orderTimeline.innerHTML = history.length
+          ? history
+            .slice()
+            .sort((a, b) => new Date(a.changedAt) - new Date(b.changedAt))
+            .map(h => `
+              <li class="timeline-item">
+                <div class="timeline-title">${h.from} → ${h.to}</div>
+                <div class="timeline-meta">操作人：${h.changedBy || '-'} ｜ 時間：${fmtDate(h.changedAt)}</div>
+              </li>
+            `)
+            .join('')
+          : '<li class="muted">尚無狀態變更紀錄</li>';
+        searchStatus.className = 'ok';
+        searchStatus.textContent = `查詢成功（來源：${json.source || 'unknown'}）`;
+      } catch (err) {
+        orderSummary.className = 'detail-box err';
+        orderSummary.textContent = '查無資料';
+        orderTimeline.innerHTML = '<li class="muted">查無資料</li>';
+        searchStatus.className = 'err';
+        searchStatus.textContent = `查詢失敗：${err.message}`;
+      }
+    }
+
+    document.getElementById('reloadBtn').addEventListener('click', loadOrders);
+    document.getElementById('searchBtn').addEventListener('click', searchOrder);
+    document.getElementById('saveApiBtn').addEventListener('click', saveApiBase);
+    document.getElementById('testApiBtn').addEventListener('click', testApiConnection);
+    window.updateStatus = updateStatus;
+    initApiBaseInput();
+    loadOrders();
+  </script>
+</body>
+</html>
