@@ -21,6 +21,11 @@
     .err { color: #c62828; }
     .detail-box { background: #f7f7f7; padding: 12px; border-radius: 8px; }
     .detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 8px; margin-bottom: 12px; }
+    .items-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 13px; background: #fff; border-radius: 8px; overflow: hidden; }
+    .items-table th, .items-table td { padding: 8px; border-bottom: 1px solid #eee; text-align: left; }
+    .items-table th { background: #fff5df; color: #5d4037; }
+    .items-table tr:last-child td { border-bottom: none; }
+    .items-total { margin-top: 8px; font-weight: bold; color: #5d4037; }
     .timeline { list-style: none; margin: 0; padding: 0; }
     .timeline-item { position: relative; padding-left: 18px; margin-bottom: 12px; }
     .timeline-item:last-child { margin-bottom: 0; }
@@ -207,6 +212,7 @@
             <td>${o.lastStatusBy || '-'}<br><span class="muted">${fmtDate(o.lastStatusAt)}</span></td>
             <td>
               <div class="row">
+                <button class="secondary" onclick="viewOrderDetail('${o.orderNumber}')">查看明細</button>
                 <select id="status-${o.orderNumber}">
                   ${statusOptions(o.status)}
                 </select>
@@ -242,6 +248,20 @@
         if (!res.ok || !json.success) throw new Error(json.message || '查詢失敗');
 
         const d = json.data || {};
+        const items = Array.isArray(d.items) ? d.items : [];
+        const itemsRows = items.map((it) => {
+          const price = Number(it.price || 0);
+          const qty = Number(it.quantity || 0);
+          const lineTotal = price * qty;
+          return `
+            <tr>
+              <td>${it.name || '-'}</td>
+              <td>NT$${price}</td>
+              <td>${qty}</td>
+              <td>NT$${lineTotal}</td>
+            </tr>
+          `;
+        }).join('');
         orderSummary.className = 'detail-box';
         orderSummary.innerHTML = `
           <div class="detail-grid">
@@ -251,7 +271,26 @@
             <div><strong>總金額：</strong>NT$${d.total ?? 0}</div>
             <div><strong>顧客：</strong>${d.customer?.name || '-'}</div>
             <div><strong>電話：</strong>${d.customer?.phone || '-'}</div>
+            <div><strong>Email：</strong>${d.customer?.email || '-'}</div>
+            <div><strong>地址：</strong>${d.customer?.address || '-'}</div>
+            <div><strong>小計：</strong>NT$${d.subtotal ?? 0}</div>
+            <div><strong>運費：</strong>NT$${d.shipping ?? 0}</div>
           </div>
+          <div><strong>商品明細</strong></div>
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th>品名</th>
+                <th>單價</th>
+                <th>數量</th>
+                <th>小計</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsRows || '<tr><td colspan="4" class="muted">無商品資料</td></tr>'}
+            </tbody>
+          </table>
+          <div class="items-total">件數：${items.reduce((sum, it) => sum + Number(it.quantity || 0), 0)} 件</div>
         `;
 
         const history = Array.isArray(d.statusHistory) ? d.statusHistory : [];
@@ -278,11 +317,19 @@
       }
     }
 
+    async function viewOrderDetail(orderNumber) {
+      const input = document.getElementById('orderNumberInput');
+      input.value = orderNumber || '';
+      await searchOrder();
+      document.querySelector('.card h3')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
     document.getElementById('reloadBtn').addEventListener('click', loadOrders);
     document.getElementById('searchBtn').addEventListener('click', searchOrder);
     document.getElementById('saveApiBtn').addEventListener('click', saveApiBase);
     document.getElementById('testApiBtn').addEventListener('click', testApiConnection);
     window.updateStatus = updateStatus;
+    window.viewOrderDetail = viewOrderDetail;
     initApiBaseInput();
     loadOrders();
   </script>
