@@ -23,8 +23,13 @@ function generateOrderNumber() {
 /**
  * 運費計算：滿 1000 免運，否則運費 150
  */
-function calculateShipping(subtotal) {
-  return subtotal >= 1000 ? 0 : 150;
+function calculateShipping(orderItems) {
+  const sweetPotatoQty = Array.isArray(orderItems)
+    ? orderItems
+      .filter((item) => String(item.name || '').includes('黃金地瓜'))
+      .reduce((sum, item) => sum + Number(item.quantity || 0), 0)
+    : 0;
+  return sweetPotatoQty >= 20 ? 0 : 150;
 }
 
 function normalizeProductName(name) {
@@ -289,8 +294,8 @@ router.post('/', async (req, res) => {
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ success: false, message: '訂單至少需包含一項商品' });
     }
-    if (!customer || !customer.name || !customer.email || !customer.phone || !customer.address) {
-      return res.status(400).json({ success: false, message: '顧客資訊不完整（姓名、Email、電話、地址皆為必填）' });
+    if (!customer || !customer.name || !customer.phone || !customer.address) {
+      return res.status(400).json({ success: false, message: '顧客資訊不完整（姓名、電話、地址皆為必填）' });
     }
     const totalAmountProvided = totalAmount !== undefined;
     const totalAmountNum = totalAmountProvided ? Number(totalAmount) : undefined;
@@ -363,7 +368,7 @@ router.post('/', async (req, res) => {
     }
 
     // --- 計算運費與總金額 ---
-    const shipping = calculateShipping(subtotal);
+    const shipping = calculateShipping(orderItems);
     const total = subtotal + shipping;
 
     // --- 金額驗證：totalAmount 與後端計算一致（若前端有提供才驗證） ---
@@ -429,7 +434,7 @@ router.post('/', async (req, res) => {
         total,
         customer: {
           name: customer.name,
-          email: customer.email,
+          email: customer.email || '',
           phone: customer.phone,
           address: customer.address,
         },
@@ -450,7 +455,7 @@ router.post('/', async (req, res) => {
         total,
         customer: {
           name: customer.name,
-          email: customer.email,
+          email: customer.email || '',
           phone: customer.phone,
           address: customer.address,
         },
@@ -483,7 +488,7 @@ router.post('/', async (req, res) => {
         subtotal: order.subtotal,
         shipping: order.shipping,
         total: order.total,
-        shippingNote: shipping === 0 ? '🎉 已達免運門檻！' : '滿 NT$1,000 即可享免運優惠',
+        shippingNote: shipping === 0 ? '🎉 黃金地瓜滿 20 盒，已免運！' : '黃金地瓜滿 20 盒即可免運',
         status: order.status,
         createdAt: order.createdAt,
       },

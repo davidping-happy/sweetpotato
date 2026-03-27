@@ -75,7 +75,7 @@ const orderSchema = new mongoose.Schema({
   },
   customer: {
     name:    { type: String, required: [true, '顧客姓名為必填'] },
-    email:   { type: String, required: [true, '電子郵件為必填'] },
+    email:   { type: String, default: '' },
     phone:   { type: String, required: [true, '電話號碼為必填'] },
     address: { type: String, required: [true, '寄送地址為必填'] },
   },
