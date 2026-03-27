@@ -356,6 +356,7 @@
             }
             return DEFAULT_CLOUD_API;
         })();
+        const productIdByName = {};
 
         // ============ Cart State ============
         let cart = [];      // { productId, name, price, img, desc, qty }
@@ -479,6 +480,9 @@
                 const images = grid.querySelectorAll('.product-card img');
 
                 products.forEach((product, i) => {
+                    if (product?.name && product?._id) {
+                        productIdByName[product.name] = product._id;
+                    }
                     if (buttons[i]) {
                         buttons[i].dataset.productId = product._id;
                         buttons[i].dataset.name = product.name;
@@ -494,6 +498,16 @@
             } catch (err) {
                 console.log('ℹ️ API 未啟動，使用前端靜態資料模式');
             }
+        }
+
+        async function ensureCartProductIds() {
+            if (cart.length === 0) return;
+            if (cart.every(item => item.productId)) return;
+            await loadProducts();
+            cart = cart.map(item => ({
+                ...item,
+                productId: item.productId || productIdByName[item.name] || null,
+            }));
         }
 
         // ============ Add to Cart ============
@@ -627,6 +641,7 @@
             btn.disabled = true;
             btn.textContent = '訂單處理中...';
 
+            await ensureCartProductIds();
             // Only submit to API when all cart items have productId
             const hasAPI = cart.length > 0 && cart.every(item => item.productId);
 
@@ -643,6 +658,13 @@
                     const json = await res.json();
                     if (json.success) {
                         const d = json.data;
+                        alert(
+                            `下單成功\nAPI: ${API_BASE}\n訂單編號: ${d.orderNumber || json.orderId || '-'}\n回應: ${JSON.stringify({
+                                success: json.success,
+                                source: json.source || 'unknown',
+                                message: json.message || '',
+                            }, null, 2)}`
+                        );
                         showToast(`✅ 訂單 ${d.orderNumber} 已建立！總計 NT$${d.total} ${d.shippingNote}`);
                         cart = [];
                         updateCartUI();
@@ -658,7 +680,10 @@
                 const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
                 const shipping = calculateShipping(subtotal);
                 const total = subtotal + shipping;
-                showToast(`✅ 訂單已記錄！共 NT$${total}（含運費 NT$${shipping}）`);
+                alert(
+                    `未送出到 API（使用離線模式）\nAPI: ${API_BASE}\n原因: 購物車商品缺少 productId，請先確認 API 連線與商品載入。`
+                );
+                showToast(`⚠️ 未送出至後端，僅本地記錄 NT$${total}（含運費 NT$${shipping}）`);
                 cart = [];
                 updateCartUI();
                 closeCart();
