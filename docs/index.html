@@ -346,8 +346,16 @@
         lucide.createIcons();
 
         // ============ Config ============
-        const API_BASE = window.location.origin.includes('localhost') || window.location.protocol === 'file:'
-            ? 'http://localhost:3000' : '';
+        const API_BASE_STORAGE_KEY = 'sweetpotato_admin_api_base';
+        const DEFAULT_CLOUD_API = 'https://sweetpotato-api.onrender.com';
+        const API_BASE = (() => {
+            const saved = (localStorage.getItem(API_BASE_STORAGE_KEY) || '').trim().replace(/\/+$/, '');
+            if (saved) return saved;
+            if (window.location.origin.includes('localhost') || window.location.protocol === 'file:') {
+                return 'http://localhost:3000';
+            }
+            return DEFAULT_CLOUD_API;
+        })();
 
         // ============ Cart State ============
         let cart = [];      // { productId, name, price, img, desc, qty }
@@ -619,8 +627,8 @@
             btn.disabled = true;
             btn.textContent = '訂單處理中...';
 
-            // Check if API is available (has productId from loadProducts)
-            const hasAPI = cart.some(item => item.productId);
+            // Only submit to API when all cart items have productId
+            const hasAPI = cart.length > 0 && cart.every(item => item.productId);
 
             if (hasAPI) {
                 try {
