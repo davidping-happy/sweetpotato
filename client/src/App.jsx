@@ -32,11 +32,11 @@ function Toast({ message, visible }) {
 export default function App() {
   // ---------- Products ----------
   const fallbackProducts = [
-    { _id: 'local-1', name: '黃金地瓜（1斤）', description: '香甜鬆軟，經典人氣品項。', price: 100, category: '烤地瓜', imageUrl: `${IMAGE_CDN_BASE}photo/002.jpg`, badge: '熱銷首選' },
-    { _id: 'local-2', name: '手作地瓜糖/酥（小盒）', description: '輕巧包裝，隨時享受甜香酥脆。', price: 45, category: '零食', imageUrl: `${IMAGE_CDN_BASE}photo/005.png` },
-    { _id: 'local-3', name: '手作地瓜糖/酥（大盒）', description: '份量更足，送禮分享都適合。', price: 65, category: '零食', imageUrl: `${IMAGE_CDN_BASE}photo/005.png` },
-    { _id: 'local-4', name: '古早味茶葉蛋（1粒）', description: '單顆選購，剛剛好的滿足。', price: 13, category: '蛋', imageUrl: `${IMAGE_CDN_BASE}photo/004.png` },
-    { _id: 'local-5', name: '古早味茶葉蛋（2粒）', description: '雙顆優惠組合，價格更划算。', price: 25, category: '蛋', imageUrl: `${IMAGE_CDN_BASE}photo/004.png` },
+    { _id: 'local-1', name: '台農57號黃金地瓜', description: '嚴選在地優質地瓜，炭火慢烤，糖蜜流溢，肉質鬆軟綿密。', price: 100, category: '烤地瓜', imageUrl: `${IMAGE_CDN_BASE}photo/002.jpg`, badge: '熱銷首選' },
+    { _id: 'local-2', name: '手作地瓜糖（小盒）', description: '酥脆地瓜片與蜜地瓜，把家鄉的溫暖帶走，追劇旅遊的最佳良伴。', price: 45, category: '零食', imageUrl: `${IMAGE_CDN_BASE}photo/005.png` },
+    { _id: 'local-3', name: '手作地瓜糖（大盒）', description: '酥脆地瓜片與蜜地瓜，把家鄉的溫暖帶走，追劇旅遊的最佳良伴。', price: 65, category: '零食', imageUrl: `${IMAGE_CDN_BASE}photo/005.png` },
+    { _id: 'local-4', name: '古早味茶葉蛋（1粒）', description: '慢熬24小時，五香漢方藥材入味，每一口都透著溫潤香氣。', price: 13, category: '蛋', imageUrl: `${IMAGE_CDN_BASE}photo/004.png` },
+    { _id: 'local-5', name: '古早味茶葉蛋（2粒）', description: '慢熬24小時，五香漢方藥材入味，每一口都透著溫潤香氣。', price: 25, category: '蛋', imageUrl: `${IMAGE_CDN_BASE}photo/004.png` },
   ];
 
   const [products, setProducts] = useState(fallbackProducts);
@@ -48,7 +48,7 @@ export default function App() {
       .then(json => {
         if (json.success && json.data.length > 0) {
           // keep badges from fallback
-          const badgeMap = { '黃金地瓜（1斤）': '熱銷首選' };
+          const badgeMap = { '台農57號黃金地瓜': '熱銷首選' };
           setProducts(json.data.map(p => ({ ...p, imageUrl: toCdnImageUrl(p.imageUrl), badge: badgeMap[p.name] })));
           setApiReady(true);
         }
