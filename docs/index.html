@@ -642,51 +642,43 @@
             btn.textContent = '訂單處理中...';
 
             await ensureCartProductIds();
-            // Only submit to API when all cart items have productId
-            const hasAPI = cart.length > 0 && cart.every(item => item.productId);
-
-            if (hasAPI) {
-                try {
-                    const res = await fetch(`${API_BASE}/api/orders`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            items: cart.map(item => ({ productId: item.productId, quantity: item.qty })),
-                            customer: { name, email, phone, address },
-                        }),
-                    });
-                    const json = await res.json();
-                    if (json.success) {
-                        const d = json.data;
-                        alert(
-                            `下單成功\nAPI: ${API_BASE}\n訂單編號: ${d.orderNumber || json.orderId || '-'}\n回應: ${JSON.stringify({
-                                success: json.success,
-                                source: json.source || 'unknown',
-                                message: json.message || '',
-                            }, null, 2)}`
-                        );
-                        showToast(`✅ 訂單 ${d.orderNumber} 已建立！總計 NT$${d.total} ${d.shippingNote}`);
-                        cart = [];
-                        updateCartUI();
-                        closeCart();
-                    } else {
-                        showToast(`❌ ${json.message}`);
-                    }
-                } catch (err) {
-                    showToast('❌ 無法連線伺服器，請稍後再試');
+            try {
+                const res = await fetch(`${API_BASE}/api/orders`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        items: cart.map(item => ({
+                            id: item.productId || undefined,
+                            productId: item.productId || undefined,
+                            name: item.name,
+                            quantity: item.qty,
+                        })),
+                        customer: { name, email, phone, address },
+                    }),
+                });
+                const json = await res.json().catch(() => ({}));
+                if (res.ok && json.success) {
+                    const d = json.data || {};
+                    alert(
+                        `下單成功\nAPI: ${API_BASE}\n訂單編號: ${d.orderNumber || json.orderId || '-'}\n回應: ${JSON.stringify({
+                            success: json.success,
+                            source: json.source || 'unknown',
+                            message: json.message || '',
+                        }, null, 2)}`
+                    );
+                    showToast(`✅ 訂單 ${d.orderNumber || json.orderId || '-'} 已建立！總計 NT$${d.total ?? '-'}`);
+                    cart = [];
+                    updateCartUI();
+                    closeCart();
+                } else {
+                    alert(
+                        `下單失敗\nAPI: ${API_BASE}\nHTTP: ${res.status}\n回應: ${JSON.stringify(json, null, 2)}`
+                    );
+                    showToast(`❌ ${json.message || '訂單送出失敗'}`);
                 }
-            } else {
-                // Fallback: offline mode
-                const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
-                const shipping = calculateShipping(subtotal);
-                const total = subtotal + shipping;
-                alert(
-                    `未送出到 API（使用離線模式）\nAPI: ${API_BASE}\n原因: 購物車商品缺少 productId，請先確認 API 連線與商品載入。`
-                );
-                showToast(`⚠️ 未送出至後端，僅本地記錄 NT$${total}（含運費 NT$${shipping}）`);
-                cart = [];
-                updateCartUI();
-                closeCart();
+            } catch (err) {
+                alert(`無法連線 API\nAPI: ${API_BASE}\n錯誤: ${err.message}`);
+                showToast('❌ 無法連線伺服器，請稍後再試');
             }
 
             btn.disabled = false;
