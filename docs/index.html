@@ -624,6 +624,8 @@
                 document.getElementById('checkout-form-wrapper').style.display = 'block';
                 btn.textContent = '確認送出訂單';
                 document.getElementById('cust-name').focus();
+                showToast('請填寫寄送資訊後，再按一次「確認送出訂單」');
+                alert('結帳分兩步：\n1) 先填寫寄送資訊\n2) 再按一次「確認送出訂單」才會真的送出');
                 return;
             }
 
