@@ -271,32 +271,21 @@ router.post('/', async (req, res) => {
     }
 
     // --- 查詢各商品正確價格（防前端竄改） ---
-    const productIds = items.map((item) => item.id || item.productId);
-    if (productIds.length !== items.length || productIds.some((id) => !id)) {
-      return res.status(400).json({ success: false, message: '商品資料格式不正確：缺少商品 id' });
-    }
-
-    const productMap = {};
+    // 允許前端傳 id/productId；若沒有 id，允許以 name 比對（避免舊前端漏傳 ID 時整筆失敗）
+    const productMapById = {};
+    const productMapByName = {};
     if (req.app.locals.db?.ready) {
-      const products = await Product.find({ _id: { $in: productIds } });
-
-      if (products.length !== productIds.length) {
-        return res.status(400).json({ success: false, message: '部分商品 ID 不存在' });
-      }
-
+      const products = await Product.find({}).lean();
       products.forEach((p) => {
-        productMap[p._id.toString()] = p;
+        productMapById[String(p._id)] = p;
+        productMapByName[p.name] = p;
       });
     } else {
       const fallback = req.app.locals.db?.fallbackProducts || [];
       fallback.forEach((p) => {
-        productMap[p._id] = p;
+        productMapById[String(p._id)] = p;
+        productMapByName[p.name] = p;
       });
-
-      const missing = productIds.filter((id) => !productMap[id]);
-      if (missing.length > 0) {
-        return res.status(400).json({ success: false, message: '部分商品 ID 不存在' });
-      }
     }
 
     // --- 組合訂單商品並計算小計 ---
@@ -304,9 +293,12 @@ router.post('/', async (req, res) => {
     const orderItems = [];
     for (const item of items) {
       const productId = item.id || item.productId;
-      const product = productMap[productId];
+      const product = (productId && productMapById[String(productId)]) || (item.name && productMapByName[item.name]);
       if (!product) {
-        return res.status(400).json({ success: false, message: '部分商品 ID 不存在' });
+        return res.status(400).json({
+          success: false,
+          message: `找不到商品（id=${productId || 'N/A'}, name=${item.name || 'N/A'}）`,
+        });
       }
       if (!product.inStock) {
         return res.status(400).json({ success: false, message: `商品「${product.name}」目前無庫存` });
