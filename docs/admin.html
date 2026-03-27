@@ -54,8 +54,10 @@
           <tr>
             <th>訂單編號</th>
             <th>建立時間</th>
-            <th>顧客</th>
-            <th>件數</th>
+            <th>產品明細</th>
+            <th>姓名</th>
+            <th>住址</th>
+            <th>電話</th>
             <th>總金額</th>
             <th>狀態</th>
             <th>最近更新</th>
@@ -63,7 +65,7 @@
           </tr>
         </thead>
         <tbody id="ordersBody">
-          <tr><td colspan="8" class="muted">載入中...</td></tr>
+          <tr><td colspan="11" class="muted">載入中...</td></tr>
         </tbody>
       </table>
     </div>
@@ -201,12 +203,19 @@
         const json = await res.json();
         if (!res.ok || !json.success) throw new Error(json.message || '載入失敗');
 
-        const rows = (json.data || []).map(o => `
+        const rows = (json.data || []).map(o => {
+          const details = Array.isArray(o.itemDetails) ? o.itemDetails : [];
+          const detailsHtml = details.length
+            ? details.map((it) => `${it.name || '-'} x${Number(it.quantity || 0)} @ NT$${Number(it.price || 0)}`).join('<br>')
+            : '-';
+          return `
           <tr>
             <td>${o.orderNumber || '-'}</td>
             <td>${fmtDate(o.createdAt)}</td>
-            <td>${o.customer?.name || '-'}<br><span class="muted">${o.customer?.phone || ''}</span></td>
-            <td>${o.itemsCount ?? '-'}</td>
+            <td>${detailsHtml}</td>
+            <td>${o.customer?.name || '-'}</td>
+            <td>${o.customer?.address || '-'}</td>
+            <td>${o.customer?.phone || '-'}</td>
             <td>NT$${o.total ?? 0}</td>
             <td>${o.status || '-'}</td>
             <td>${o.lastStatusBy || '-'}<br><span class="muted">${fmtDate(o.lastStatusAt)}</span></td>
@@ -220,13 +229,14 @@
               </div>
             </td>
           </tr>
-        `).join('');
+        `;
+        }).join('');
 
-        ordersBody.innerHTML = rows || '<tr><td colspan="8" class="muted">目前沒有訂單</td></tr>';
+        ordersBody.innerHTML = rows || '<tr><td colspan="11" class="muted">目前沒有訂單</td></tr>';
         statusEl.className = 'ok';
         statusEl.textContent = `載入成功，共 ${json.count || 0} 筆（來源：${json.source || 'unknown'}）`;
       } catch (err) {
-        ordersBody.innerHTML = '<tr><td colspan="8" class="err">載入失敗，請確認後端已啟動</td></tr>';
+        ordersBody.innerHTML = '<tr><td colspan="11" class="err">載入失敗，請確認後端已啟動</td></tr>';
         statusEl.className = 'err';
         statusEl.textContent = `載入失敗：${err.message}`;
       }

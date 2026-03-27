@@ -59,10 +59,18 @@ function formatOrderForList(order) {
   const latestHistory = Array.isArray(order.statusHistory) && order.statusHistory.length > 0
     ? order.statusHistory[order.statusHistory.length - 1]
     : null;
+  const itemDetails = Array.isArray(order.items)
+    ? order.items.map((item) => ({
+      name: item.name,
+      quantity: Number(item.quantity || 0),
+      price: Number(item.price || 0),
+    }))
+    : [];
   return {
     orderNumber: order.orderNumber,
     status: order.status,
     customer: order.customer,
+    itemDetails,
     itemsCount: Array.isArray(order.items)
       ? order.items.reduce((sum, item) => sum + Number(item.quantity || 0), 0)
       : 0,
