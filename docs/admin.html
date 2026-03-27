@@ -80,7 +80,9 @@
 
   <script>
     const API_BASE_STORAGE_KEY = 'sweetpotato_admin_api_base';
-    const DEFAULT_API_BASE = window.location.origin.includes('localhost') ? 'http://localhost:3000' : '';
+    const DEFAULT_API_BASE = window.location.origin.includes('localhost')
+      ? 'http://localhost:3000'
+      : 'https://sweetpotato-api.onrender.com';
     const ordersBody = document.getElementById('ordersBody');
     const statusEl = document.getElementById('status');
     const searchStatus = document.getElementById('searchStatus');

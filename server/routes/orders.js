@@ -27,6 +27,34 @@ function calculateShipping(subtotal) {
   return subtotal >= 1000 ? 0 : 150;
 }
 
+function normalizeProductName(name) {
+  return String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[（）]/g, (ch) => (ch === '（' ? '(' : ')'))
+    .replace(/\s+/g, '')
+    .replace(/[／]/g, '/');
+}
+
+function findProductByLooseName(rawName, productMapByName, normalizedProductMap) {
+  if (!rawName) return null;
+
+  const direct = productMapByName[rawName];
+  if (direct) return direct;
+
+  const normalizedInput = normalizeProductName(rawName);
+  if (!normalizedInput) return null;
+
+  const normalizedDirect = normalizedProductMap[normalizedInput];
+  if (normalizedDirect) return normalizedDirect;
+
+  // 舊版前端可能傳「手作地瓜糖/酥」而非「手作地瓜糖/酥（小盒）」：允許前綴比對
+  const partial = Object.entries(normalizedProductMap).find(([key]) =>
+    key.startsWith(normalizedInput) || normalizedInput.startsWith(key),
+  );
+  return partial ? partial[1] : null;
+}
+
 function formatOrderForList(order) {
   const latestHistory = Array.isArray(order.statusHistory) && order.statusHistory.length > 0
     ? order.statusHistory[order.statusHistory.length - 1]
@@ -275,17 +303,20 @@ router.post('/', async (req, res) => {
     // 允許前端傳 id/productId；若沒有 id，允許以 name 比對（避免舊前端漏傳 ID 時整筆失敗）
     const productMapById = {};
     const productMapByName = {};
+    const normalizedProductMap = {};
     if (req.app.locals.db?.ready) {
       const products = await Product.find({}).lean();
       products.forEach((p) => {
         productMapById[String(p._id)] = p;
         productMapByName[p.name] = p;
+        normalizedProductMap[normalizeProductName(p.name)] = p;
       });
     } else {
       const fallback = req.app.locals.db?.fallbackProducts || [];
       fallback.forEach((p) => {
         productMapById[String(p._id)] = p;
         productMapByName[p.name] = p;
+        normalizedProductMap[normalizeProductName(p.name)] = p;
       });
     }
 
@@ -294,7 +325,9 @@ router.post('/', async (req, res) => {
     const orderItems = [];
     for (const item of items) {
       const productId = item.id || item.productId;
-      const product = (productId && productMapById[String(productId)]) || (item.name && productMapByName[item.name]);
+      const product =
+        (productId && productMapById[String(productId)])
+        || findProductByLooseName(item.name, productMapByName, normalizedProductMap);
       if (!product) {
         return res.status(400).json({
           success: false,
