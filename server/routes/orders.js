@@ -223,6 +223,7 @@ router.patch('/:orderNumber/status', async (req, res) => {
       changedBy,
       changedAt: new Date(),
     });
+    await req.app.locals.db.saveFallbackOrders();
     return res.json({
       success: true,
       source: 'memory',
@@ -422,6 +423,7 @@ router.post('/', async (req, res) => {
         createdAt: new Date(),
       };
       req.app.locals.db.fallbackOrders.push(order);
+      await req.app.locals.db.saveFallbackOrders();
     }
 
     // --- 非同步寄送確認郵件（不阻塞回應） ---

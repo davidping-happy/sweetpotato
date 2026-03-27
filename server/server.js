@@ -3,6 +3,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs/promises');
 
 const Product = require('./models/Product');
 const seedProducts = require('./seed/products');
@@ -11,6 +12,8 @@ const ordersRouter = require('./routes/orders');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const FALLBACK_DATA_DIR = path.join(__dirname, 'data');
+const FALLBACK_ORDERS_FILE = path.join(FALLBACK_DATA_DIR, 'orders.json');
 
 // ====== DB fallback (no Mongo / no mongodb-memory-server) ======
 const fallbackProducts = seedProducts.map((p, idx) => ({
@@ -23,7 +26,29 @@ app.locals.db = {
   ready: false,
   fallbackProducts,
   fallbackOrders: [],
+  saveFallbackOrders: async () => {},
 };
+
+async function loadFallbackOrdersFromFile() {
+  try {
+    await fs.mkdir(FALLBACK_DATA_DIR, { recursive: true });
+    const raw = await fs.readFile(FALLBACK_ORDERS_FILE, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed;
+  } catch {
+    return [];
+  }
+}
+
+async function saveFallbackOrdersToFile(orders) {
+  try {
+    await fs.mkdir(FALLBACK_DATA_DIR, { recursive: true });
+    await fs.writeFile(FALLBACK_ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf8');
+  } catch (err) {
+    console.error('⚠️  寫入 fallback 訂單檔失敗:', err.message);
+  }
+}
 
 // ============ Middleware ============
 app.use(cors());
@@ -68,6 +93,15 @@ async function startServer() {
   try {
     const dbReady = await connectMongo();
     app.locals.db.ready = dbReady;
+
+    // memory fallback 模式：啟動時先載入已保存訂單，並提供保存函式
+    if (!dbReady) {
+      app.locals.db.fallbackOrders = await loadFallbackOrdersFromFile();
+      app.locals.db.saveFallbackOrders = async () => {
+        await saveFallbackOrdersToFile(app.locals.db.fallbackOrders || []);
+      };
+      console.log(`🗂️  fallback 訂單已載入 ${app.locals.db.fallbackOrders.length} 筆`);
+    }
 
     if (dbReady) {
       // 自動 seed：若商品表為空則寫入初始資料
