@@ -19,6 +19,7 @@
     .err { color: #c62828; }
     .muted { color: #777; }
   </style>
+  <script src="./admin-config.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./admin-auth.js"></script>
 </head>
@@ -29,12 +30,6 @@
       <p>請使用 Supabase Email/Password 帳號登入，未登入將無法進入後台。</p>
 
       <form id="loginForm">
-        <label for="supabaseUrl">Supabase URL</label>
-        <input id="supabaseUrl" type="url" placeholder="https://xxxxx.supabase.co" required />
-
-        <label for="supabaseAnonKey">Supabase Anon Key</label>
-        <input id="supabaseAnonKey" type="password" placeholder="輸入 anon key" required />
-
         <label for="email">Email</label>
         <input id="email" type="email" placeholder="admin@example.com" required />
 
@@ -44,7 +39,7 @@
         <button id="loginBtn" type="submit">登入後台</button>
       </form>
 
-      <div id="message" class="msg muted">請先輸入 Supabase 設定與管理員帳密。</div>
+      <div id="message" class="msg muted">請輸入管理員 Email / Password。</div>
     </div>
   </div>
 
@@ -52,8 +47,6 @@
     const form = document.getElementById('loginForm');
     const msg = document.getElementById('message');
     const loginBtn = document.getElementById('loginBtn');
-    const supabaseUrlInput = document.getElementById('supabaseUrl');
-    const supabaseAnonKeyInput = document.getElementById('supabaseAnonKey');
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
     const redirectTarget = './admin.html';
@@ -68,7 +61,7 @@
       if (reason === 'unauthorized') {
         setMessage('請先登入才能查看後台資料。', 'err');
       } else if (reason === 'config') {
-        setMessage('請先填入 Supabase URL 與 Anon Key。', 'err');
+        setMessage('請先設定 docs/admin-config.js 的 Supabase URL 與 Anon Key。', 'err');
       }
     }
 
@@ -83,22 +76,25 @@
       }
     }
 
-    function initConfigInputs() {
-      const cfg = window.AdminAuth.getStoredConfig();
-      supabaseUrlInput.value = cfg.url || '';
-      supabaseAnonKeyInput.value = cfg.anonKey || '';
+    function ensureConfigReady() {
+      const cfg = window.AdminAuth.getConfigFromWindow();
+      if (!cfg.url || !cfg.anonKey) {
+        setMessage('系統尚未設定登入服務，請先填寫 docs/admin-config.js。', 'err');
+        loginBtn.disabled = true;
+        return false;
+      }
+      loginBtn.disabled = false;
+      return true;
     }
 
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
+      if (!ensureConfigReady()) return;
       loginBtn.disabled = true;
       setMessage('登入中...', 'muted');
 
-      const url = supabaseUrlInput.value.trim();
-      const anonKey = supabaseAnonKeyInput.value.trim();
       const email = emailInput.value.trim();
       const password = passwordInput.value;
-      window.AdminAuth.saveConfig(url, anonKey);
 
       try {
         const { error } = await window.AdminAuth.signInWithPassword(email, password);
@@ -112,7 +108,7 @@
       }
     });
 
-    initConfigInputs();
+    ensureConfigReady();
     applyReasonMessage();
     checkExistingSession();
   </script>

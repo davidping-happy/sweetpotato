@@ -1,30 +1,23 @@
 (() => {
-  const SUPABASE_URL_KEY = 'sweetpotato_supabase_url';
-  const SUPABASE_ANON_KEY = 'sweetpotato_supabase_anon_key';
-
   function normalizeValue(value) {
     return String(value || '').trim();
   }
 
-  function getStoredConfig() {
+  function getConfigFromWindow() {
+    const cfg = window.SWEETPOTATO_ADMIN_CONFIG || {};
     return {
-      url: normalizeValue(localStorage.getItem(SUPABASE_URL_KEY)),
-      anonKey: normalizeValue(localStorage.getItem(SUPABASE_ANON_KEY)),
+      url: normalizeValue(cfg.supabaseUrl),
+      anonKey: normalizeValue(cfg.supabaseAnonKey),
     };
-  }
-
-  function saveConfig(url, anonKey) {
-    localStorage.setItem(SUPABASE_URL_KEY, normalizeValue(url));
-    localStorage.setItem(SUPABASE_ANON_KEY, normalizeValue(anonKey));
   }
 
   function getClient() {
     if (!window.supabase || typeof window.supabase.createClient !== 'function') {
       throw new Error('Supabase SDK 尚未載入');
     }
-    const config = getStoredConfig();
+    const config = getConfigFromWindow();
     if (!config.url || !config.anonKey) {
-      throw new Error('尚未設定 Supabase URL / Anon Key');
+      throw new Error('尚未設定 admin-config.js 的 Supabase URL / Anon Key');
     }
     return window.supabase.createClient(config.url, config.anonKey);
   }
@@ -61,10 +54,7 @@
   }
 
   window.AdminAuth = {
-    SUPABASE_URL_KEY,
-    SUPABASE_ANON_KEY,
-    getStoredConfig,
-    saveConfig,
+    getConfigFromWindow,
     getClient,
     requireAdminSession,
     signInWithPassword,
