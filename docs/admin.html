@@ -43,6 +43,7 @@
     <div class="card">
       <div class="row">
         <button id="reloadBtn">重新載入訂單</button>
+        <button id="logoutBtn" class="secondary">登出</button>
         <input id="operatorInput" value="admin" placeholder="操作人（例如店長）" />
         <input id="apiBaseInput" placeholder="API URL（例如 https://your-api.com）" style="min-width:320px;" />
         <button id="saveApiBtn" class="secondary">儲存 API URL</button>
@@ -85,6 +86,8 @@
     </div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./admin-auth.js"></script>
   <script>
     const API_BASE_STORAGE_KEY = 'sweetpotato_admin_api_base';
     const DEFAULT_API_BASE = window.location.origin.includes('localhost')
@@ -92,6 +95,7 @@
       : 'https://sweetpotato-api.onrender.com';
     const ordersBody = document.getElementById('ordersBody');
     const statusEl = document.getElementById('status');
+    const logoutBtn = document.getElementById('logoutBtn');
     const searchStatus = document.getElementById('searchStatus');
     const orderSummary = document.getElementById('orderSummary');
     const orderTimeline = document.getElementById('orderTimeline');
@@ -127,6 +131,18 @@
       const base = getApiBase();
       const normalizedPath = path.startsWith('/') ? path : `/${path}`;
       return `${base}${normalizedPath}`;
+    }
+
+    async function getAuthHeaders() {
+      const client = window.AdminAuth.getClient();
+      const { data, error } = await client.auth.getSession();
+      if (error || !data?.session?.access_token) {
+        window.location.replace('./admin-login.html?reason=unauthorized');
+        throw new Error('未登入或登入已過期');
+      }
+      return {
+        Authorization: `Bearer ${data.session.access_token}`,
+      };
     }
 
     function initApiBaseInput() {
@@ -180,7 +196,10 @@
       try {
         const res = await fetch(apiUrl(`/api/orders/${encodeURIComponent(orderNumber)}/status`), {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(await getAuthHeaders()),
+          },
           body: JSON.stringify({ status: nextStatus, changedBy }),
         });
         const json = await res.json();
@@ -199,7 +218,10 @@
       statusEl.className = 'muted';
       statusEl.textContent = '載入中...';
       try {
-        const res = await fetch(apiUrl('/api/orders?limit=100'));
+        const authHeaders = await getAuthHeaders();
+        const res = await fetch(apiUrl('/api/orders?limit=100'), {
+          headers: authHeaders,
+        });
         const json = await res.json();
         if (!res.ok || !json.success) throw new Error(json.message || '載入失敗');
 
@@ -253,7 +275,9 @@
       searchStatus.textContent = '查詢中...';
 
       try {
-        const res = await fetch(apiUrl(`/api/orders/${encodeURIComponent(orderNumber)}`));
+        const res = await fetch(apiUrl(`/api/orders/${encodeURIComponent(orderNumber)}`), {
+          headers: await getAuthHeaders(),
+        });
         const json = await res.json();
         if (!res.ok || !json.success) throw new Error(json.message || '查詢失敗');
 
@@ -334,14 +358,28 @@
       document.querySelector('.card h3')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 
+    async function logout() {
+      try {
+        await window.AdminAuth.signOut();
+      } catch (_) {
+        // ignore
+      }
+      window.location.replace('./admin-login.html');
+    }
+
     document.getElementById('reloadBtn').addEventListener('click', loadOrders);
+    logoutBtn.addEventListener('click', logout);
     document.getElementById('searchBtn').addEventListener('click', searchOrder);
     document.getElementById('saveApiBtn').addEventListener('click', saveApiBase);
     document.getElementById('testApiBtn').addEventListener('click', testApiConnection);
     window.updateStatus = updateStatus;
     window.viewOrderDetail = viewOrderDetail;
-    initApiBaseInput();
-    loadOrders();
+    (async () => {
+      const auth = await window.AdminAuth.requireAdminSession({ loginPath: './admin-login.html' });
+      if (!auth?.session) return;
+      initApiBaseInput();
+      loadOrders();
+    })();
   </script>
 </body>
 </html>

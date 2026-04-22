@@ -2,6 +2,7 @@ const express = require('express');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const { sendOrderConfirmation } = require('../utils/mailer');
+const { requireSupabaseAuth } = require('../middleware/requireSupabaseAuth');
 
 const router = express.Router();
 
@@ -113,7 +114,7 @@ const STATUS_TRANSITIONS = {
 
 // ============ GET /api/orders ============
 // 簡易後台查詢：支援 MongoDB 與 in-memory fallback 兩種模式
-router.get('/', async (req, res) => {
+router.get('/', requireSupabaseAuth, async (req, res) => {
   try {
     const limitRaw = Number(req.query.limit);
     const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(Math.floor(limitRaw), 200) : 50;
@@ -147,7 +148,7 @@ router.get('/', async (req, res) => {
 });
 
 // ============ GET /api/orders/:orderNumber ============
-router.get('/:orderNumber', async (req, res) => {
+router.get('/:orderNumber', requireSupabaseAuth, async (req, res) => {
   try {
     const orderNumber = String(req.params.orderNumber || '').trim();
     if (!orderNumber) {
@@ -175,7 +176,7 @@ router.get('/:orderNumber', async (req, res) => {
 });
 
 // ============ PATCH /api/orders/:orderNumber/status ============
-router.patch('/:orderNumber/status', async (req, res) => {
+router.patch('/:orderNumber/status', requireSupabaseAuth, async (req, res) => {
   try {
     const orderNumber = String(req.params.orderNumber || '').trim();
     const status = String(req.body?.status || '').trim();

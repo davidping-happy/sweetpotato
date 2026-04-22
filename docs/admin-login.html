@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>磐石烤地瓜 - 後台登入</title>
+  <style>
+    body { margin: 0; font-family: Arial, sans-serif; background: #fff9e6; color: #3a2e2a; }
+    .wrap { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+    .card { width: 100%; max-width: 460px; background: #fff; border-radius: 12px; padding: 20px; box-shadow: 0 4px 16px rgba(0,0,0,.08); }
+    h1 { margin: 0 0 6px; color: #f28c28; }
+    p { margin: 0 0 14px; color: #6b5a55; font-size: 14px; }
+    label { display: block; margin: 10px 0 4px; font-size: 13px; color: #5d4037; font-weight: 600; }
+    input { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+    button { width: 100%; margin-top: 14px; border: none; border-radius: 8px; padding: 11px 12px; background: #f28c28; color: #fff; font-size: 14px; cursor: pointer; }
+    button:disabled { opacity: .7; cursor: wait; }
+    .msg { margin-top: 12px; font-size: 13px; }
+    .ok { color: #0f8a43; }
+    .err { color: #c62828; }
+    .muted { color: #777; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./admin-auth.js"></script>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>後台登入</h1>
+      <p>請使用 Supabase Email/Password 帳號登入，未登入將無法進入後台。</p>
+
+      <form id="loginForm">
+        <label for="supabaseUrl">Supabase URL</label>
+        <input id="supabaseUrl" type="url" placeholder="https://xxxxx.supabase.co" required />
+
+        <label for="supabaseAnonKey">Supabase Anon Key</label>
+        <input id="supabaseAnonKey" type="password" placeholder="輸入 anon key" required />
+
+        <label for="email">Email</label>
+        <input id="email" type="email" placeholder="admin@example.com" required />
+
+        <label for="password">Password</label>
+        <input id="password" type="password" placeholder="輸入密碼" required />
+
+        <button id="loginBtn" type="submit">登入後台</button>
+      </form>
+
+      <div id="message" class="msg muted">請先輸入 Supabase 設定與管理員帳密。</div>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('loginForm');
+    const msg = document.getElementById('message');
+    const loginBtn = document.getElementById('loginBtn');
+    const supabaseUrlInput = document.getElementById('supabaseUrl');
+    const supabaseAnonKeyInput = document.getElementById('supabaseAnonKey');
+    const emailInput = document.getElementById('email');
+    const passwordInput = document.getElementById('password');
+    const redirectTarget = './admin.html';
+
+    function setMessage(text, cls) {
+      msg.className = `msg ${cls || 'muted'}`;
+      msg.textContent = text;
+    }
+
+    function applyReasonMessage() {
+      const reason = new URLSearchParams(window.location.search).get('reason');
+      if (reason === 'unauthorized') {
+        setMessage('請先登入才能查看後台資料。', 'err');
+      } else if (reason === 'config') {
+        setMessage('請先填入 Supabase URL 與 Anon Key。', 'err');
+      }
+    }
+
+    async function checkExistingSession() {
+      try {
+        const auth = await window.AdminAuth.requireAdminSession({ loginPath: './admin-login.html' });
+        if (auth?.session) {
+          window.location.replace(redirectTarget);
+        }
+      } catch (_) {
+        // ignore
+      }
+    }
+
+    function initConfigInputs() {
+      const cfg = window.AdminAuth.getStoredConfig();
+      supabaseUrlInput.value = cfg.url || '';
+      supabaseAnonKeyInput.value = cfg.anonKey || '';
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      loginBtn.disabled = true;
+      setMessage('登入中...', 'muted');
+
+      const url = supabaseUrlInput.value.trim();
+      const anonKey = supabaseAnonKeyInput.value.trim();
+      const email = emailInput.value.trim();
+      const password = passwordInput.value;
+      window.AdminAuth.saveConfig(url, anonKey);
+
+      try {
+        const { error } = await window.AdminAuth.signInWithPassword(email, password);
+        if (error) throw error;
+        setMessage('登入成功，跳轉中...', 'ok');
+        window.location.replace(redirectTarget);
+      } catch (err) {
+        setMessage(`登入失敗：${err.message || '未知錯誤'}`, 'err');
+      } finally {
+        loginBtn.disabled = false;
+      }
+    });
+
+    initConfigInputs();
+    applyReasonMessage();
+    checkExistingSession();
+  </script>
+</body>
+</html>

@@ -9,6 +9,10 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_AUDIENCE
+        value: authenticated
       # Optional: set this in Render dashboard if using MongoDB Atlas
       # - key: MONGODB_URI
       #   value: mongodb+srv://<username>:<password>@<cluster>/<db>
