@@ -24,17 +24,22 @@
 
   async function requireAdminSession(options = {}) {
     const loginPath = options.loginPath || './admin-login.html';
+    const redirectOnFail = options.redirectOnFail !== false;
     let client;
     try {
       client = getClient();
     } catch (err) {
-      window.location.replace(`${loginPath}?reason=config`);
+      if (redirectOnFail) {
+        window.location.replace(`${loginPath}?reason=config`);
+      }
       return null;
     }
 
     const { data, error } = await client.auth.getSession();
     if (error || !data?.session) {
-      window.location.replace(`${loginPath}?reason=unauthorized`);
+      if (redirectOnFail) {
+        window.location.replace(`${loginPath}?reason=unauthorized`);
+      }
       return null;
     }
     return { client, session: data.session };

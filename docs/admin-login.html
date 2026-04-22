@@ -67,7 +67,10 @@
 
     async function checkExistingSession() {
       try {
-        const auth = await window.AdminAuth.requireAdminSession({ loginPath: './admin-login.html' });
+        const auth = await window.AdminAuth.requireAdminSession({
+          loginPath: './admin-login.html',
+          redirectOnFail: false,
+        });
         if (auth?.session) {
           window.location.replace(redirectTarget);
         }
