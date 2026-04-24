@@ -53,6 +53,18 @@
     });
   }
 
+  async function requestPasswordReset(email, redirectTo) {
+    const client = getClient();
+    return client.auth.resetPasswordForEmail(normalizeValue(email), {
+      redirectTo: normalizeValue(redirectTo),
+    });
+  }
+
+  async function updatePassword(newPassword) {
+    const client = getClient();
+    return client.auth.updateUser({ password: String(newPassword || '') });
+  }
+
   async function signOut() {
     const client = getClient();
     return client.auth.signOut();
@@ -63,6 +75,8 @@
     getClient,
     requireAdminSession,
     signInWithPassword,
+    requestPasswordReset,
+    updatePassword,
     signOut,
   };
 })();
