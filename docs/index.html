@@ -721,6 +721,19 @@
                 .join('');
         }
 
+        function formatNotificationStatus(type, result) {
+            if (!result) return `${type} 通知未知`;
+            if (result.sent) return `${type} 通知已送出`;
+
+            const reason = String(result.reason || '');
+            if (reason === 'disabled_by_customer') return `${type} 通知未啟用`;
+            if (reason === 'missing_customer_email') return '未填寫 Email，無法寄送 Email 通知';
+            if (reason === 'smtp_not_configured') return 'Email 通知未設定（請在 Render 設定 SMTP）';
+            if (reason === 'missing_webhook_url') return 'LINE 通知未設定（請在 Render 設定 LINE_NOTIFY_WEBHOOK_URL）';
+            if (reason.startsWith('http_')) return `${type} 通知失敗（Webhook 回應 ${reason.replace('http_', 'HTTP ')})`;
+            return `${type} 通知失敗`;
+        }
+
         document.getElementById('checkout-btn').addEventListener('click', async function() {
             if (cart.length === 0) return;
             const btn = this;
@@ -783,12 +796,8 @@
                 const json = await res.json().catch(() => ({}));
                 if (res.ok && json.success) {
                     const d = json.data || {};
-                    const emailStatus = d.notifications?.email?.sent
-                        ? 'Email 通知已寄出'
-                        : (d.notifications?.email?.attempted ? 'Email 通知寄送失敗' : 'Email 通知未啟用');
-                    const lineStatus = d.notifications?.line?.sent
-                        ? 'LINE 通知已送出'
-                        : (d.notifications?.line?.attempted ? 'LINE 通知送出失敗' : 'LINE 通知未啟用');
+                    const emailStatus = formatNotificationStatus('Email', d.notifications?.email);
+                    const lineStatus = formatNotificationStatus('LINE', d.notifications?.line);
                     alert(`訂單建立成功！\n訂單編號：${d.orderNumber || json.orderId || '-'}\n${emailStatus}\n${lineStatus}`);
                     showToast(`✅ 訂單 ${d.orderNumber || json.orderId || '-'} 已建立`);
                     cart = [];
