@@ -86,8 +86,6 @@
     </div>
   </div>
 
-  <script src="./admin-config.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./admin-auth.js"></script>
   <script>
     const API_BASE_STORAGE_KEY = 'sweetpotato_admin_api_base';
@@ -135,15 +133,12 @@
     }
 
     async function getAuthHeaders() {
-      const client = window.AdminAuth.getClient();
-      const { data, error } = await client.auth.getSession();
-      if (error || !data?.session?.access_token) {
+      const authHeaders = await window.AdminAuth.getAuthHeaders();
+      if (!authHeaders?.Authorization) {
         window.location.replace('./admin-login.html?reason=unauthorized');
         throw new Error('未登入或登入已過期');
       }
-      return {
-        Authorization: `Bearer ${data.session.access_token}`,
-      };
+      return authHeaders;
     }
 
     function initApiBaseInput() {

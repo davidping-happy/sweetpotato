@@ -14,25 +14,19 @@
     input { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
     button { width: 100%; margin-top: 14px; border: none; border-radius: 8px; padding: 11px 12px; background: #f28c28; color: #fff; font-size: 14px; cursor: pointer; }
     button:disabled { opacity: .7; cursor: wait; }
-    button.secondary { background: #5d4037; }
-    .inline-link { margin-top: 10px; font-size: 13px; color: #5d4037; text-decoration: underline; cursor: pointer; border: none; background: transparent; padding: 0; width: auto; }
-    .hidden { display: none; }
     .msg { margin-top: 12px; font-size: 13px; }
     .ok { color: #0f8a43; }
     .err { color: #c62828; }
     .muted { color: #777; }
-    .section-title { margin-top: 14px; margin-bottom: 8px; font-size: 14px; color: #5d4037; font-weight: 700; }
-    .divider { border: 0; border-top: 1px solid #eee; margin: 14px 0; }
+    .inline-link { margin-top: 10px; font-size: 13px; color: #5d4037; text-decoration: underline; cursor: pointer; border: none; background: transparent; padding: 0; width: auto; }
   </style>
-  <script src="./admin-config.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./admin-auth.js"></script>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
       <h1>後台登入</h1>
-      <p>請使用 Supabase Email/Password 帳號登入，未登入將無法進入後台。</p>
+      <p>請使用後台管理員帳號登入，未登入將無法進入後台。</p>
 
       <form id="loginForm">
         <label for="email">Email</label>
@@ -43,15 +37,7 @@
 
         <button id="loginBtn" type="submit">登入後台</button>
       </form>
-      <button id="forgotBtn" type="button" class="inline-link">忘記密碼？寄送重設連結</button>
-
-      <div id="resetSection" class="hidden">
-        <hr class="divider" />
-        <div class="section-title">重設密碼</div>
-        <label for="newPassword">新密碼</label>
-        <input id="newPassword" type="password" placeholder="請輸入新密碼（至少 6 碼）" />
-        <button id="resetPasswordBtn" type="button" class="secondary">更新為新密碼</button>
-      </div>
+      <button id="forgotBtn" type="button" class="inline-link">忘記密碼？請聯絡系統管理員</button>
 
       <div id="message" class="msg muted">請輸入管理員 Email / Password。</div>
     </div>
@@ -62,11 +48,8 @@
     const msg = document.getElementById('message');
     const loginBtn = document.getElementById('loginBtn');
     const forgotBtn = document.getElementById('forgotBtn');
-    const resetSection = document.getElementById('resetSection');
-    const resetPasswordBtn = document.getElementById('resetPasswordBtn');
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
-    const newPasswordInput = document.getElementById('newPassword');
     const redirectTarget = './admin.html';
 
     function setMessage(text, cls) {
@@ -78,8 +61,6 @@
       const reason = new URLSearchParams(window.location.search).get('reason');
       if (reason === 'unauthorized') {
         setMessage('請先登入才能查看後台資料。', 'err');
-      } else if (reason === 'config') {
-        setMessage('請先設定 docs/admin-config.js 的 Supabase URL 與 Anon Key。', 'err');
       }
     }
 
@@ -97,35 +78,8 @@
       }
     }
 
-    function ensureConfigReady() {
-      const cfg = window.AdminAuth.getConfigFromWindow();
-      const issues = window.AdminAuth.getConfigIssues(cfg);
-      if (issues.length > 0) {
-        setMessage(`admin-config.js 設定錯誤：${issues.join('；')}`, 'err');
-        loginBtn.disabled = true;
-        forgotBtn.disabled = true;
-        return false;
-      }
-      loginBtn.disabled = false;
-      forgotBtn.disabled = false;
-      return true;
-    }
-
-    function isRecoveryMode() {
-      const hash = window.location.hash || '';
-      const params = new URLSearchParams(hash.startsWith('#') ? hash.slice(1) : hash);
-      return params.get('type') === 'recovery' && Boolean(params.get('access_token'));
-    }
-
-    function initRecoveryMode() {
-      if (!isRecoveryMode()) return;
-      resetSection.classList.remove('hidden');
-      setMessage('已進入密碼重設模式，請輸入新密碼。', 'ok');
-    }
-
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
-      if (!ensureConfigReady()) return;
       loginBtn.disabled = true;
       setMessage('登入中...', 'muted');
 
@@ -144,61 +98,19 @@
       }
     });
 
-    forgotBtn.addEventListener('click', async () => {
-      if (!ensureConfigReady()) return;
+    forgotBtn.addEventListener('click', () => {
       const email = emailInput.value.trim();
       if (!email) {
-        setMessage('請先輸入 Email，再點選忘記密碼。', 'err');
+        setMessage('請先輸入 Email，再聯絡管理員重設密碼。', 'err');
         emailInput.focus();
         return;
       }
-
-      forgotBtn.disabled = true;
-      setMessage('寄送密碼重設信中...', 'muted');
-      try {
-        const redirectTo = `${window.location.origin}${window.location.pathname}`;
-        const { error } = await window.AdminAuth.requestPasswordReset(email, redirectTo);
-        if (error) throw error;
-        setMessage('已寄出重設信，請到信箱點擊連結後回到本頁設定新密碼。', 'ok');
-      } catch (err) {
-        setMessage(`寄送失敗：${err.message || '未知錯誤'}`, 'err');
-      } finally {
-        forgotBtn.disabled = false;
-      }
+      setMessage('此系統使用 Render 後端登入，請聯絡管理員於後台重設密碼。', 'muted');
     });
 
-    resetPasswordBtn.addEventListener('click', async () => {
-      if (!ensureConfigReady()) return;
-      if (!isRecoveryMode()) {
-        setMessage('請先從重設密碼信中的連結開啟此頁面。', 'err');
-        return;
-      }
-
-      const nextPassword = String(newPasswordInput.value || '').trim();
-      if (nextPassword.length < 6) {
-        setMessage('新密碼至少 6 碼。', 'err');
-        return;
-      }
-
-      resetPasswordBtn.disabled = true;
-      setMessage('更新密碼中...', 'muted');
-      try {
-        const { error } = await window.AdminAuth.updatePassword(nextPassword);
-        if (error) throw error;
-        setMessage('密碼更新成功，請使用新密碼登入。', 'ok');
-        newPasswordInput.value = '';
-        window.history.replaceState({}, '', window.location.pathname);
-        resetSection.classList.add('hidden');
-      } catch (err) {
-        setMessage(`更新失敗：${err.message || '未知錯誤'}`, 'err');
-      } finally {
-        resetPasswordBtn.disabled = false;
-      }
-    });
-
-    ensureConfigReady();
+    loginBtn.disabled = false;
+    forgotBtn.disabled = false;
     applyReasonMessage();
-    initRecoveryMode();
     checkExistingSession();
   </script>
 </body>

@@ -9,6 +9,7 @@ const Product = require('./models/Product');
 const seedProducts = require('./seed/products');
 const productsRouter = require('./routes/products');
 const ordersRouter = require('./routes/orders');
+const adminAuthRouter = require('./routes/adminAuth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -59,6 +60,7 @@ app.use(express.static(path.join(__dirname, '..', 'docs')));
 
 // ============ API 路由 ============
 app.use('/api/products', productsRouter);
+app.use('/api/admin', adminAuthRouter);
 app.use('/api/orders', ordersRouter);
 
 // ============ 健康檢查 ============
