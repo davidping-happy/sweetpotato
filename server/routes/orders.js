@@ -483,7 +483,7 @@ router.post('/', async (req, res) => {
 
     const normalizedNotifyPreference = ['email', 'line', 'both', 'none'].includes(notifyPreference)
       ? notifyPreference
-      : (customer?.email ? 'email' : 'none');
+      : (customer?.email ? 'both' : 'line');
 
     if (normalizedNotifyPreference === 'email' || normalizedNotifyPreference === 'both') {
       try {

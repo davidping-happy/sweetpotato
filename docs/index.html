@@ -157,7 +157,7 @@
                 <select id="notify-preference" class="w-full border border-outline/30 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40">
                     <option value="email">Email 通知（需填 Email）</option>
                     <option value="line">LINE 通知（店家端）</option>
-                    <option value="both">LINE + Email 都通知</option>
+                    <option value="both" selected>LINE + Email 都通知</option>
                     <option value="none">不通知</option>
                 </select>
                 <p id="checkout-validation" class="text-xs text-red-600"></p>
@@ -817,7 +817,7 @@
             ['cust-name', 'cust-phone', 'cust-email', 'cust-address'].forEach(id => {
                 document.getElementById(id).value = '';
             });
-            document.getElementById('notify-preference').value = 'email';
+            document.getElementById('notify-preference').value = 'both';
         });
 
         // ============ Init ============
