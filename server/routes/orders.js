@@ -2,6 +2,7 @@ const express = require('express');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const { sendOrderConfirmation } = require('../utils/mailer');
+const { sendLineOrderNotification } = require('../utils/lineNotifier');
 const { requireAdminAuth } = require('../middleware/requireAdminAuth');
 
 const router = express.Router();
@@ -289,6 +290,7 @@ router.post('/', async (req, res) => {
       totalAmount,
       shopInfo,
       customer,
+      notifyPreference,
     } = req.body || {};
 
     // --- 驗證輸入 ---
@@ -473,10 +475,28 @@ router.post('/', async (req, res) => {
       await req.app.locals.db.saveFallbackOrders();
     }
 
-    // --- 非同步寄送確認郵件（不阻塞回應） ---
-    sendOrderConfirmation(order).catch((err) => {
-      console.error('寄送訂單確認郵件失敗:', err.message);
-    });
+    // --- 通知（Email / LINE） ---
+    const notifications = {
+      email: { attempted: false, sent: false, reason: 'disabled_by_customer' },
+      line: { attempted: false, sent: false, reason: 'disabled_by_customer' },
+    };
+
+    const normalizedNotifyPreference = ['email', 'line', 'both', 'none'].includes(notifyPreference)
+      ? notifyPreference
+      : (customer?.email ? 'email' : 'none');
+
+    if (normalizedNotifyPreference === 'email' || normalizedNotifyPreference === 'both') {
+      try {
+        notifications.email = await sendOrderConfirmation(order);
+      } catch (err) {
+        notifications.email = { attempted: true, sent: false, reason: err.message };
+      }
+    }
+    if (normalizedNotifyPreference === 'line' || normalizedNotifyPreference === 'both') {
+      notifications.line = await sendLineOrderNotification(order, {
+        notifyPreference: normalizedNotifyPreference,
+      });
+    }
 
     // --- 回傳結果 ---
     res.status(201).json({
@@ -492,6 +512,7 @@ router.post('/', async (req, res) => {
         shippingNote: shipping === 0 ? '🎉 黃金地瓜滿 20 盒，已免運！' : '黃金地瓜滿 20 盒即可免運',
         status: order.status,
         createdAt: order.createdAt,
+        notifications,
       },
     });
   } catch (err) {

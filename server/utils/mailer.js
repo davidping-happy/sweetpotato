@@ -39,6 +39,10 @@ async function sendOrderConfirmation(order) {
   const subject = `【磐石烤地瓜】訂單確認 — ${order.orderNumber}`;
 
   // 若無 SMTP 設定，以 console 模擬
+  if (!order.customer?.email) {
+    return { attempted: false, sent: false, reason: 'missing_customer_email' };
+  }
+
   if (!transporter) {
     console.log('──────────────────────────────────');
     console.log('📧 模擬寄送訂單確認郵件');
@@ -46,7 +50,7 @@ async function sendOrderConfirmation(order) {
     console.log(`   主旨:   ${subject}`);
     console.log(`   訂單:   ${order.orderNumber} | NT$${order.total}`);
     console.log('──────────────────────────────────');
-    return;
+    return { attempted: true, sent: false, reason: 'smtp_not_configured' };
   }
 
   const mailOptions = {
@@ -58,6 +62,7 @@ async function sendOrderConfirmation(order) {
 
   const info = await transporter.sendMail(mailOptions);
   console.log(`✅ 訂單確認郵件已寄送: ${info.messageId}`);
+  return { attempted: true, sent: true, messageId: info.messageId };
 }
 
 module.exports = { sendOrderConfirmation };

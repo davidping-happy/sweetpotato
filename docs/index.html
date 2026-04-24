@@ -146,6 +146,19 @@
                 <input id="cust-phone" type="tel" placeholder="電話 *" class="w-full border border-outline/30 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
                 <input id="cust-email" type="email" placeholder="Email（選填）" class="w-full border border-outline/30 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
                 <input id="cust-address" type="text" placeholder="寄送地址 *" class="w-full border border-outline/30 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
+                <select id="notify-preference" class="w-full border border-outline/30 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40">
+                    <option value="email">Email 通知（需填 Email）</option>
+                    <option value="line">LINE 通知（店家端）</option>
+                    <option value="both">LINE + Email 都通知</option>
+                    <option value="none">不通知</option>
+                </select>
+                <p id="checkout-validation" class="text-xs text-red-600"></p>
+            </div>
+
+            <div id="checkout-confirm-wrapper" style="display:none;" class="mb-4 space-y-3 bg-white/70 border border-outline/20 rounded-lg p-3">
+                <h4 class="font-bold text-secondary text-sm mb-1">請確認訂單內容</h4>
+                <div id="checkout-confirm-summary" class="text-sm text-secondary space-y-1"></div>
+                <div id="checkout-confirm-items" class="text-sm text-secondary/80 space-y-1"></div>
             </div>
 
             <button class="w-full py-4 bg-primary text-white font-bold rounded-xl shadow-lg shadow-primary/20 hover:brightness-105 active:scale-[0.98] transition-all" id="checkout-btn">
@@ -396,7 +409,7 @@
 
         // ============ Cart State ============
         let cart = [];      // { productId, name, price, img, desc, qty }
-        let checkoutStep = 0; // 0 = cart view, 1 = form visible
+        let checkoutStep = 0; // 0 = cart view, 1 = form visible, 2 = confirm
 
         function calculateShippingByCart() {
             const sweetPotatoQty = cart
@@ -599,6 +612,7 @@
             // Reset checkout form
             checkoutStep = 0;
             document.getElementById('checkout-form-wrapper').style.display = 'none';
+            document.getElementById('checkout-confirm-wrapper').style.display = 'none';
             document.getElementById('checkout-btn').textContent = '前往結帳';
         }
 
@@ -653,32 +667,87 @@
         });
 
         // ============ Checkout ============
+        function collectCheckoutFields() {
+            return {
+                name: document.getElementById('cust-name').value.trim(),
+                phone: document.getElementById('cust-phone').value.trim(),
+                email: document.getElementById('cust-email').value.trim(),
+                address: document.getElementById('cust-address').value.trim(),
+                notifyPreference: document.getElementById('notify-preference').value || 'email',
+            };
+        }
+
+        function validateCheckoutFields(fields) {
+            if (!fields.name || !fields.phone || !fields.address) {
+                return '請填寫姓名、電話與寄送地址';
+            }
+            if (fields.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email)) {
+                return 'Email 格式不正確';
+            }
+            if ((fields.notifyPreference === 'email' || fields.notifyPreference === 'both') && !fields.email) {
+                return '選擇 Email 通知時，請填寫 Email';
+            }
+            return '';
+        }
+
+        function renderCheckoutConfirmation(fields) {
+            const subtotal = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+            const shipping = calculateShippingByCart();
+            const total = subtotal + shipping;
+            const notifyMap = {
+                email: 'Email 通知',
+                line: 'LINE 通知',
+                both: 'LINE + Email',
+                none: '不通知',
+            };
+            document.getElementById('checkout-confirm-summary').innerHTML = `
+                <div><strong>姓名：</strong>${fields.name}</div>
+                <div><strong>電話：</strong>${fields.phone}</div>
+                <div><strong>Email：</strong>${fields.email || '未填寫'}</div>
+                <div><strong>地址：</strong>${fields.address}</div>
+                <div><strong>通知方式：</strong>${notifyMap[fields.notifyPreference] || 'Email 通知'}</div>
+                <div><strong>總計：</strong>NT$${total}（含運費 ${shipping === 0 ? '免運' : `NT$${shipping}`}）</div>
+            `;
+            document.getElementById('checkout-confirm-items').innerHTML = cart
+                .map(item => `<div>・${item.name} x ${item.qty} = NT$${item.price * item.qty}</div>`)
+                .join('');
+        }
+
         document.getElementById('checkout-btn').addEventListener('click', async function() {
             if (cart.length === 0) return;
             const btn = this;
+            const validationEl = document.getElementById('checkout-validation');
+            validationEl.textContent = '';
 
             // Step 1: Show the form
             if (checkoutStep === 0) {
                 checkoutStep = 1;
                 document.getElementById('checkout-form-wrapper').style.display = 'block';
-                btn.textContent = '確認送出訂單';
+                document.getElementById('checkout-confirm-wrapper').style.display = 'none';
+                btn.textContent = '下一步：確認訂單';
                 document.getElementById('cust-name').focus();
-                showToast('請填寫寄送資訊後，再按一次「確認送出訂單」');
-                alert('結帳分兩步：\n1) 先填寫寄送資訊\n2) 再按一次「確認送出訂單」才會真的送出');
+                showToast('請先填寫寄送資訊');
                 return;
             }
 
-            // Step 2: Validate & submit
-            const name = document.getElementById('cust-name').value.trim();
-            const phone = document.getElementById('cust-phone').value.trim();
-            const email = document.getElementById('cust-email').value.trim();
-            const address = document.getElementById('cust-address').value.trim();
-
-            if (!name || !phone || !address) {
-                showToast('⚠️ 請填寫姓名、電話與寄送地址');
+            const fields = collectCheckoutFields();
+            const validationMessage = validateCheckoutFields(fields);
+            if (validationMessage) {
+                validationEl.textContent = validationMessage;
+                showToast(`⚠️ ${validationMessage}`);
                 return;
             }
 
+            if (checkoutStep === 1) {
+                checkoutStep = 2;
+                renderCheckoutConfirmation(fields);
+                document.getElementById('checkout-confirm-wrapper').style.display = 'block';
+                btn.textContent = '確認送出訂單';
+                showToast('請確認訂單資訊後送出');
+                return;
+            }
+
+            // Step 3: Submit order
             btn.disabled = true;
             btn.textContent = '訂單處理中...';
 
@@ -694,31 +763,33 @@
                             name: item.name,
                             quantity: item.qty,
                         })),
-                        customer: { name, email, phone, address },
+                        customer: {
+                            name: fields.name,
+                            email: fields.email,
+                            phone: fields.phone,
+                            address: fields.address,
+                        },
+                        notifyPreference: fields.notifyPreference,
                     }),
                 });
                 const json = await res.json().catch(() => ({}));
                 if (res.ok && json.success) {
                     const d = json.data || {};
-                    alert(
-                        `下單成功\nAPI: ${API_BASE}\n訂單編號: ${d.orderNumber || json.orderId || '-'}\n回應: ${JSON.stringify({
-                            success: json.success,
-                            source: json.source || 'unknown',
-                            message: json.message || '',
-                        }, null, 2)}`
-                    );
-                    showToast(`✅ 訂單 ${d.orderNumber || json.orderId || '-'} 已建立！總計 NT$${d.total ?? '-'}`);
+                    const emailStatus = d.notifications?.email?.sent
+                        ? 'Email 通知已寄出'
+                        : (d.notifications?.email?.attempted ? 'Email 通知寄送失敗' : 'Email 通知未啟用');
+                    const lineStatus = d.notifications?.line?.sent
+                        ? 'LINE 通知已送出'
+                        : (d.notifications?.line?.attempted ? 'LINE 通知送出失敗' : 'LINE 通知未啟用');
+                    alert(`訂單建立成功！\n訂單編號：${d.orderNumber || json.orderId || '-'}\n${emailStatus}\n${lineStatus}`);
+                    showToast(`✅ 訂單 ${d.orderNumber || json.orderId || '-'} 已建立`);
                     cart = [];
                     updateCartUI();
                     closeCart();
                 } else {
-                    alert(
-                        `下單失敗\nAPI: ${API_BASE}\nHTTP: ${res.status}\n回應: ${JSON.stringify(json, null, 2)}`
-                    );
                     showToast(`❌ ${json.message || '訂單送出失敗'}`);
                 }
             } catch (err) {
-                alert(`無法連線 API\nAPI: ${API_BASE}\n錯誤: ${err.message}`);
                 showToast('❌ 無法連線伺服器，請稍後再試');
             }
 
@@ -729,6 +800,7 @@
             ['cust-name', 'cust-phone', 'cust-email', 'cust-address'].forEach(id => {
                 document.getElementById(id).value = '';
             });
+            document.getElementById('notify-preference').value = 'email';
         });
 
         // ============ Init ============
