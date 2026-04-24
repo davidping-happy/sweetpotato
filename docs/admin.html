@@ -372,7 +372,7 @@
     window.viewOrderDetail = viewOrderDetail;
     (async () => {
       const auth = await window.AdminAuth.requireAdminSession({ loginPath: './admin-login.html' });
-      if (!auth?.session) return;
+      if (!auth?.token) return;
       initApiBaseInput();
       loadOrders();
     })();
