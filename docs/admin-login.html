@@ -99,12 +99,15 @@
 
     function ensureConfigReady() {
       const cfg = window.AdminAuth.getConfigFromWindow();
-      if (!cfg.url || !cfg.anonKey) {
-        setMessage('系統尚未設定登入服務，請先填寫 docs/admin-config.js。', 'err');
+      const issues = window.AdminAuth.getConfigIssues(cfg);
+      if (issues.length > 0) {
+        setMessage(`admin-config.js 設定錯誤：${issues.join('；')}`, 'err');
         loginBtn.disabled = true;
+        forgotBtn.disabled = true;
         return false;
       }
       loginBtn.disabled = false;
+      forgotBtn.disabled = false;
       return true;
     }
 

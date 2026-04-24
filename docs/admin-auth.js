@@ -11,13 +11,33 @@
     };
   }
 
+  function getConfigIssues(config = getConfigFromWindow()) {
+    const issues = [];
+    if (!config.url) {
+      issues.push('缺少 supabaseUrl');
+    } else if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(config.url)) {
+      issues.push('supabaseUrl 格式錯誤（需為 https://<project-ref>.supabase.co）');
+    }
+
+    if (!config.anonKey) {
+      issues.push('缺少 supabaseAnonKey');
+    } else {
+      const tokenParts = config.anonKey.split('.');
+      if (tokenParts.length !== 3) {
+        issues.push('supabaseAnonKey 格式錯誤（需為 Supabase anon public JWT）');
+      }
+    }
+    return issues;
+  }
+
   function getClient() {
     if (!window.supabase || typeof window.supabase.createClient !== 'function') {
       throw new Error('Supabase SDK 尚未載入');
     }
     const config = getConfigFromWindow();
-    if (!config.url || !config.anonKey) {
-      throw new Error('尚未設定 admin-config.js 的 Supabase URL / Anon Key');
+    const issues = getConfigIssues(config);
+    if (issues.length > 0) {
+      throw new Error(`admin-config.js 設定錯誤：${issues.join('；')}`);
     }
     return window.supabase.createClient(config.url, config.anonKey);
   }
@@ -72,6 +92,7 @@
 
   window.AdminAuth = {
     getConfigFromWindow,
+    getConfigIssues,
     getClient,
     requireAdminSession,
     signInWithPassword,
