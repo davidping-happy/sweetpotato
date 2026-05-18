@@ -2,7 +2,7 @@ const express = require('express');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const { sendOrderConfirmation } = require('../utils/mailer');
-const { sendLineOrderNotification } = require('../utils/lineNotifier');
+const { sendLineOrderNotifications } = require('../utils/lineNotifier');
 const { requireAdminAuth } = require('../middleware/requireAdminAuth');
 
 const router = express.Router();
@@ -440,6 +440,7 @@ router.post('/', async (req, res) => {
           email: customer.email || '',
           phone: customer.phone,
           address: customer.address,
+          lineUserId: String(customer.lineUserId || '').trim(),
         },
         status: 'pending',
         statusHistory: [{
@@ -461,6 +462,7 @@ router.post('/', async (req, res) => {
           email: customer.email || '',
           phone: customer.phone,
           address: customer.address,
+          lineUserId: String(customer.lineUserId || '').trim(),
         },
         status: 'pending',
         statusHistory: [{
@@ -478,7 +480,10 @@ router.post('/', async (req, res) => {
     // --- 通知（Email / LINE） ---
     const notifications = {
       email: { attempted: false, sent: false, reason: 'disabled_by_customer' },
-      line: { attempted: false, sent: false, reason: 'disabled_by_customer' },
+      line: {
+        shop: { attempted: false, sent: false, reason: 'disabled_by_customer' },
+        customer: { attempted: false, sent: false, reason: 'disabled_by_customer' },
+      },
     };
 
     const normalizedNotifyPreference = ['email', 'line', 'both', 'none'].includes(notifyPreference)
@@ -493,7 +498,7 @@ router.post('/', async (req, res) => {
       }
     }
     if (normalizedNotifyPreference === 'line' || normalizedNotifyPreference === 'both') {
-      notifications.line = await sendLineOrderNotification(order, {
+      notifications.line = await sendLineOrderNotifications(order, {
         notifyPreference: normalizedNotifyPreference,
       });
     }

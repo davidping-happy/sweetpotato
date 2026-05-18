@@ -74,10 +74,11 @@ const orderSchema = new mongoose.Schema({
     min: 0,
   },
   customer: {
-    name:    { type: String, required: [true, '顧客姓名為必填'] },
-    email:   { type: String, default: '' },
-    phone:   { type: String, required: [true, '電話號碼為必填'] },
-    address: { type: String, required: [true, '寄送地址為必填'] },
+    name:       { type: String, required: [true, '顧客姓名為必填'] },
+    email:      { type: String, default: '' },
+    phone:      { type: String, required: [true, '電話號碼為必填'] },
+    address:    { type: String, required: [true, '寄送地址為必填'] },
+    lineUserId: { type: String, default: '' },
   },
   status: {
     type: String,

@@ -58,6 +58,14 @@ app.use(express.json());
 // 靜態檔案：統一使用 docs 作為唯一前台來源
 app.use(express.static(path.join(__dirname, '..', 'docs')));
 
+// ============ 公開設定（不含密鑰） ============
+app.get('/api/config', (req, res) => {
+  res.json({
+    lineLiffId: String(process.env.LINE_LIFF_ID || '').trim(),
+    lineCustomerNotifyEnabled: Boolean(String(process.env.LINE_CHANNEL_ACCESS_TOKEN || '').trim()),
+  });
+});
+
 // ============ API 路由 ============
 app.use('/api/products', productsRouter);
 app.use('/api/admin', adminAuthRouter);

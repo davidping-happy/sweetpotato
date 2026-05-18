@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script id="tailwind-config">
         tailwind.config = {
             darkMode: "class",
@@ -155,11 +156,16 @@
                 <input id="cust-email" type="email" placeholder="Email（選填）" class="w-full border border-outline/30 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
                 <input id="cust-address" type="text" placeholder="寄送地址 *" class="w-full border border-outline/30 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
                 <select id="notify-preference" class="w-full border border-outline/30 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40">
-                    <option value="email">Email 通知（需填 Email）</option>
-                    <option value="line">LINE 通知（店家端）</option>
-                    <option value="both" selected>LINE + Email 都通知</option>
+                    <option value="email">Email 確認信（寄到您的信箱）</option>
+                    <option value="line">僅通知店家 LINE（新訂單提醒）</option>
+                    <option value="both" selected>Email + 我的 LINE 都通知</option>
                     <option value="none">不通知</option>
                 </select>
+                <input id="cust-line-user-id" type="hidden" value="" />
+                <button type="button" id="line-bind-btn" style="display:none;" class="w-full py-2.5 border border-primary/40 text-primary text-sm font-semibold rounded-lg hover:bg-primary/5">
+                    綁定 LINE 接收訂單通知
+                </button>
+                <p id="line-bind-status" class="text-xs text-secondary/80" style="display:none;"></p>
                 <p id="checkout-validation" class="text-xs text-red-600"></p>
             </div>
 
@@ -414,6 +420,59 @@
             return DEFAULT_CLOUD_API;
         })();
         const productIdByName = {};
+        let publicConfig = { lineLiffId: '', lineCustomerNotifyEnabled: false };
+
+        async function loadPublicConfig() {
+            try {
+                const res = await fetch(`${API_BASE}/api/config`);
+                const json = await res.json().catch(() => ({}));
+                publicConfig = {
+                    lineLiffId: String(json.lineLiffId || '').trim(),
+                    lineCustomerNotifyEnabled: Boolean(json.lineCustomerNotifyEnabled),
+                };
+                const bindBtn = document.getElementById('line-bind-btn');
+                const bindStatus = document.getElementById('line-bind-status');
+                if (publicConfig.lineLiffId) {
+                    bindBtn.style.display = 'block';
+                    bindStatus.style.display = 'block';
+                    bindStatus.textContent = '選擇「Email + 我的 LINE」時，請先綁定 LINE。';
+                }
+            } catch (_) {
+                // ignore
+            }
+        }
+
+        async function bindLineForNotifications() {
+            const bindBtn = document.getElementById('line-bind-btn');
+            const bindStatus = document.getElementById('line-bind-status');
+            if (!publicConfig.lineLiffId) {
+                showToast('⚠️ 尚未設定 LINE 綁定（LINE_LIFF_ID）');
+                return;
+            }
+            if (!window.liff) {
+                showToast('⚠️ LINE SDK 載入中，請稍後再試');
+                return;
+            }
+            bindBtn.disabled = true;
+            bindStatus.textContent = 'LINE 綁定中...';
+            try {
+                await window.liff.init({ liffId: publicConfig.lineLiffId });
+                if (!window.liff.isLoggedIn()) {
+                    window.liff.login();
+                    return;
+                }
+                const profile = await window.liff.getProfile();
+                document.getElementById('cust-line-user-id').value = profile.userId || '';
+                bindStatus.textContent = `已綁定 LINE：${profile.displayName || '完成'}`;
+                bindBtn.textContent = '已綁定 LINE ✓';
+                showToast('✅ LINE 綁定成功，可接收訂單通知');
+            } catch (err) {
+                bindStatus.textContent = 'LINE 綁定失敗，請重試';
+                showToast(`❌ LINE 綁定失敗：${err.message || '未知錯誤'}`);
+            } finally {
+                bindBtn.disabled = false;
+            }
+        }
 
         // ============ Cart State ============
         let cart = [];      // { productId, name, price, img, desc, qty }
@@ -681,6 +740,7 @@
                 phone: document.getElementById('cust-phone').value.trim(),
                 email: document.getElementById('cust-email').value.trim(),
                 address: document.getElementById('cust-address').value.trim(),
+                lineUserId: document.getElementById('cust-line-user-id').value.trim(),
                 notifyPreference: document.getElementById('notify-preference').value || 'email',
             };
         }
@@ -693,7 +753,10 @@
                 return 'Email 格式不正確';
             }
             if ((fields.notifyPreference === 'email' || fields.notifyPreference === 'both') && !fields.email) {
-                return '選擇 Email 通知時，請填寫 Email';
+                return '選擇 Email 確認信時，請填寫 Email';
+            }
+            if (fields.notifyPreference === 'both' && publicConfig.lineLiffId && !fields.lineUserId) {
+                return '請先點「綁定 LINE 接收訂單通知」';
             }
             return '';
         }
@@ -703,9 +766,9 @@
             const shipping = calculateShippingByCart();
             const total = subtotal + shipping;
             const notifyMap = {
-                email: 'Email 通知',
-                line: 'LINE 通知',
-                both: 'LINE + Email',
+                email: 'Email 確認信',
+                line: '僅通知店家 LINE',
+                both: 'Email + 我的 LINE',
                 none: '不通知',
             };
             document.getElementById('checkout-confirm-summary').innerHTML = `
@@ -722,16 +785,29 @@
         }
 
         function formatNotificationStatus(type, result) {
-            if (!result) return `${type} 通知未知`;
-            if (result.sent) return `${type} 通知已送出`;
+            if (!result) return `${type}：狀態未知`;
+            if (result.sent) return `${type}：已送出`;
 
             const reason = String(result.reason || '');
-            if (reason === 'disabled_by_customer') return `${type} 通知未啟用`;
-            if (reason === 'missing_customer_email') return '未填寫 Email，無法寄送 Email 通知';
-            if (reason === 'smtp_not_configured') return 'Email 通知未設定（請在 Render 設定 SMTP）';
-            if (reason === 'missing_webhook_url') return 'LINE 通知未設定（請在 Render 設定 LINE_NOTIFY_WEBHOOK_URL）';
-            if (reason.startsWith('http_')) return `${type} 通知失敗（Webhook 回應 ${reason.replace('http_', 'HTTP ')})`;
-            return `${type} 通知失敗`;
+            if (reason === 'disabled_by_customer') return `${type}：未啟用`;
+            if (reason === 'missing_customer_email') return 'Email：未填寫信箱，無法寄送';
+            if (reason === 'smtp_not_configured') return 'Email：伺服器未設定 SMTP';
+            if (reason === 'missing_customer_line_user_id') return '您的 LINE：尚未綁定，無法推播';
+            if (reason === 'missing_line_channel_token') return '您的 LINE：伺服器未設定 LINE_CHANNEL_ACCESS_TOKEN';
+            if (reason === 'missing_line_shop_config') return '店家 LINE：未設定（需 LINE_CHANNEL_ACCESS_TOKEN + LINE_SHOP_USER_ID）';
+            if (reason === 'webhook_accepted_unverified') return '店家 LINE：Webhook 已接收但未確認送達（建議改用 Messaging API）';
+            if (reason.startsWith('line_api_')) return `${type}：LINE API 失敗（${reason.replace('line_api_', 'HTTP ')})`;
+            if (reason.startsWith('http_')) return `${type}：Webhook 失敗（${reason.replace('http_', 'HTTP ')})`;
+            return `${type}：失敗（${reason || '未知原因'}）`;
+        }
+
+        function formatLineNotificationSummary(line, notifyPreference) {
+            if (notifyPreference === 'email' || notifyPreference === 'none') return '';
+            if (!line) return 'LINE：狀態未知';
+            const shop = formatNotificationStatus('店家 LINE', line.shop);
+            if (notifyPreference === 'line') return shop;
+            const customer = formatNotificationStatus('您的 LINE', line.customer);
+            return `${shop}\n${customer}`;
         }
 
         document.getElementById('checkout-btn').addEventListener('click', async function() {
@@ -789,6 +865,7 @@
                             email: fields.email,
                             phone: fields.phone,
                             address: fields.address,
+                            lineUserId: fields.lineUserId,
                         },
                         notifyPreference: fields.notifyPreference,
                     }),
@@ -797,8 +874,9 @@
                 if (res.ok && json.success) {
                     const d = json.data || {};
                     const emailStatus = formatNotificationStatus('Email', d.notifications?.email);
-                    const lineStatus = formatNotificationStatus('LINE', d.notifications?.line);
-                    alert(`訂單建立成功！\n訂單編號：${d.orderNumber || json.orderId || '-'}\n${emailStatus}\n${lineStatus}`);
+                    const lineStatus = formatLineNotificationSummary(d.notifications?.line, fields.notifyPreference);
+                    const notifyLines = [emailStatus, lineStatus].filter(Boolean).join('\n');
+                    alert(`訂單建立成功！\n訂單編號：${d.orderNumber || json.orderId || '-'}\n${notifyLines}`);
                     showToast(`✅ 訂單 ${d.orderNumber || json.orderId || '-'} 已建立`);
                     cart = [];
                     updateCartUI();
@@ -817,12 +895,21 @@
             ['cust-name', 'cust-phone', 'cust-email', 'cust-address'].forEach(id => {
                 document.getElementById(id).value = '';
             });
+            document.getElementById('cust-line-user-id').value = '';
+            document.getElementById('line-bind-status').textContent = publicConfig.lineLiffId
+                ? '選擇「Email + 我的 LINE」時，請先綁定 LINE。'
+                : '';
+            const bindBtn = document.getElementById('line-bind-btn');
+            if (bindBtn) bindBtn.textContent = '綁定 LINE 接收訂單通知';
             document.getElementById('notify-preference').value = 'both';
         });
+
+        document.getElementById('line-bind-btn').addEventListener('click', bindLineForNotifications);
 
         // ============ Init ============
         updateCartUI();
         loadProducts();
+        loadPublicConfig();
     </script>
 </body>
 </html>
