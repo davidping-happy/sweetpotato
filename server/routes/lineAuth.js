@@ -84,6 +84,16 @@ router.get('/login/start', async (req, res) => {
     returnUrl = defaultReturn;
   }
 
+  if (req.query.openCart === '1') {
+    try {
+      const withCart = new URL(returnUrl);
+      withCart.searchParams.set('openCart', '1');
+      returnUrl = withCart.toString();
+    } catch {
+      // keep returnUrl
+    }
+  }
+
   const { channelId } = getLineLoginCredentials();
   const callbackUrl = getLineLoginCallbackUrl(req);
   const state = crypto.randomBytes(16).toString('hex');
@@ -97,8 +107,11 @@ router.get('/login/start', async (req, res) => {
   authorizeUrl.searchParams.set('state', state);
   // 僅 profile：避免未啟用 OpenID Connect 時 LINE 顯示「無法正常執行」
   authorizeUrl.searchParams.set('scope', 'profile');
+  // iOS / 內建瀏覽器：避免自動登入失敗後反覆出現「無法正常執行」
+  authorizeUrl.searchParams.set('disable_auto_login', 'true');
+  authorizeUrl.searchParams.set('disable_ios_auto_login', 'true');
 
-  console.log('LINE Login start:', { callbackUrl, returnUrl });
+  console.log('LINE Login start:', { channelId, callbackUrl, returnUrl });
 
   return res.redirect(authorizeUrl.toString());
 });

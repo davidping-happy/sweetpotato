@@ -88,10 +88,10 @@
                 <a class="hover:text-primary transition-colors" href="#story">品牌故事</a>
             </div>
             <div class="flex items-center gap-1 sm:gap-3 shrink-0">
-                <button type="button" id="nav-line-bind-btn" class="js-line-bind-btn inline-flex flex-col items-center justify-center w-11 h-11 sm:w-auto sm:h-auto sm:flex-row sm:gap-1 px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-bold rounded-xl sm:rounded-full border-2 border-[#06C755] text-[#06C755] bg-[#06C755]/10 hover:bg-[#06C755]/15 active:scale-[0.98] transition-all" title="綁定 LINE 訂單通知" aria-label="綁定 LINE 通知">
+                <a href="#" id="nav-line-bind-btn" role="button" class="js-line-bind-btn inline-flex flex-col items-center justify-center w-11 h-11 sm:w-auto sm:h-auto sm:flex-row sm:gap-1 px-1.5 py-1 sm:px-3 sm:py-1.5 text-[10px] sm:text-xs font-bold rounded-xl sm:rounded-full border-2 border-[#06C755] text-[#06C755] bg-[#06C755]/10 hover:bg-[#06C755]/15 active:scale-[0.98] transition-all no-underline" title="綁定 LINE 訂單通知" aria-label="綁定 LINE 通知">
                     <i data-lucide="message-circle" class="w-5 h-5 shrink-0"></i>
                     <span id="nav-line-bind-label" class="leading-none">LINE</span>
-                </button>
+                </a>
                 <button class="relative text-primary w-11 h-11 sm:w-auto sm:h-auto flex items-center justify-center hover:bg-primary/10 rounded-full transition-colors shrink-0" id="open-cart-btn" aria-label="購物車">
                     <i data-lucide="shopping-cart" class="w-5 h-5"></i>
                     <span class="absolute top-0.5 right-0.5 bg-primary text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-background cart-count" style="display:none;">0</span>
@@ -113,10 +113,10 @@
             <a class="text-primary hover:opacity-80 transition-opacity py-2" href="#" id="mobile-nav-home">首頁</a>
             <a class="hover:text-primary transition-colors py-2" href="#products" id="mobile-nav-products">精選產品</a>
             <a class="hover:text-primary transition-colors py-2" href="#story" id="mobile-nav-story">品牌故事</a>
-            <button type="button" id="mobile-line-bind-btn" class="js-line-bind-btn mt-2 w-full py-3 rounded-xl border-2 border-[#06C755] text-[#06C755] font-bold text-sm hover:bg-[#06C755]/10 transition-colors flex items-center justify-center gap-2">
+            <a href="#" id="mobile-line-bind-btn" role="button" class="js-line-bind-btn mt-2 w-full py-3 rounded-xl border-2 border-[#06C755] text-[#06C755] font-bold text-sm hover:bg-[#06C755]/10 transition-colors flex items-center justify-center gap-2 no-underline">
                 <i data-lucide="message-circle" class="w-5 h-5"></i>
                 <span id="mobile-line-bind-label">綁定 LINE 通知</span>
-            </button>
+            </a>
         </div>
     </div>
 
@@ -131,10 +131,10 @@
                 <span class="truncate">購物車</span>
             </h2>
             <div class="flex items-center gap-1.5 shrink-0">
-                <button type="button" id="cart-line-bind-btn" class="js-line-bind-btn inline-flex flex-col items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl border-2 border-[#06C755] text-[#06C755] bg-[#06C755]/10 hover:bg-[#06C755]/15 active:scale-[0.98] transition-all" title="綁定 LINE 訂單通知" aria-label="綁定 LINE 通知">
+                <a href="#" id="cart-line-bind-btn" role="button" class="js-line-bind-btn inline-flex flex-col items-center justify-center w-10 h-10 sm:w-11 sm:h-11 rounded-xl border-2 border-[#06C755] text-[#06C755] bg-[#06C755]/10 hover:bg-[#06C755]/15 active:scale-[0.98] transition-all no-underline" title="綁定 LINE 訂單通知" aria-label="綁定 LINE 通知">
                     <i data-lucide="message-circle" class="w-4 h-4 sm:w-5 sm:h-5 shrink-0"></i>
                     <span id="cart-line-bind-label" class="text-[9px] sm:text-[10px] font-bold leading-none mt-0.5">LINE</span>
-                </button>
+                </a>
                 <button class="p-2 hover:bg-gray-100 rounded-full shrink-0" id="close-cart-btn" aria-label="關閉購物車">
                     <i data-lucide="x"></i>
                 </button>
@@ -162,10 +162,10 @@
                 <span class="text-xl font-extrabold text-primary" id="cart-total">NT$0</span>
             </div>
 
-            <button type="button" id="cart-footer-line-bind-btn" class="js-line-bind-btn w-full mb-4 py-3 rounded-xl border-2 border-[#06C755] text-[#06C755] font-bold text-sm hover:bg-[#06C755]/10 transition-colors flex items-center justify-center gap-2">
+            <a href="#" id="cart-footer-line-bind-btn" role="button" class="js-line-bind-btn w-full mb-4 py-3 rounded-xl border-2 border-[#06C755] text-[#06C755] font-bold text-sm hover:bg-[#06C755]/10 transition-colors flex items-center justify-center gap-2 no-underline">
                 <i data-lucide="message-circle" class="w-5 h-5"></i>
                 <span id="cart-footer-line-bind-label">綁定 LINE 通知</span>
-            </button>
+            </a>
 
             <!-- Checkout Form (initially hidden) -->
             <div id="checkout-form-wrapper" style="display:none;" class="mb-4 space-y-3">
@@ -440,6 +440,7 @@
         let publicConfig = {
             lineLoginEnabled: false,
             lineLoginConfigError: '',
+            lineLoginChannelHint: '',
             lineLoginCallbackUrl: '',
             lineCustomerNotifyEnabled: false,
         };
@@ -538,7 +539,8 @@
             }
             if (msg.includes('無法正常執行') || msg.includes('LINE Login 設定') || msg.includes('invalid_client')) {
                 const cb = publicConfig.lineLoginCallbackUrl || 'https://sweetpotato-api.onrender.com/api/line/login/callback';
-                return `LINE 登入失敗：請確認使用「LINE Login」頻道，且 Callback URL 設為 ${cb}`;
+                const hint = publicConfig.lineLoginChannelHint ? `（頻道尾碼 ${publicConfig.lineLoginChannelHint}）` : '';
+                return `LINE 登入失敗${hint}：請在 LINE Login 頻道設定 Callback URL 為 ${cb}，並按 Publish`;
             }
             return msg || 'LINE 綁定失敗，請稍後再試';
         }
@@ -547,10 +549,6 @@
             const url = new URL(`${window.location.origin}${window.location.pathname}`);
             if (options.openCart) url.searchParams.set('openCart', '1');
             return url.toString();
-        }
-
-        function isCartOpen() {
-            return document.getElementById('cart-drawer')?.classList.contains('open');
         }
 
         function applyLineBindFromUrl() {
@@ -589,12 +587,13 @@
                 publicConfig = {
                     lineLoginEnabled: Boolean(json.lineLoginEnabled),
                     lineLoginConfigError: String(json.lineLoginConfigError || '').trim(),
+                    lineLoginChannelHint: String(json.lineLoginChannelHint || '').trim(),
                     lineLoginCallbackUrl: String(json.lineLoginCallbackUrl || '').trim(),
                     lineCustomerNotifyEnabled: Boolean(json.lineCustomerNotifyEnabled),
                 };
 
                 applyLineBindFromUrl();
-
+                syncLineBindLinks();
                 showLineBindButtons();
 
                 if (!publicConfig.lineLoginEnabled) {
@@ -616,8 +615,37 @@
             }
         }
 
-        function bindLineForNotifications() {
-            if (!publicConfig.lineLoginEnabled) {
+        function isCartLineBindBtn(btn) {
+            return btn.id === 'cart-line-bind-btn' || btn.id === 'cart-footer-line-bind-btn';
+        }
+
+        function buildLineLoginHref(openCart) {
+            const returnUrl = encodeURIComponent(getStorefrontReturnUrl());
+            const openCartParam = openCart ? '&openCart=1' : '';
+            return `${API_BASE}/api/line/login/start?returnUrl=${returnUrl}${openCartParam}`;
+        }
+
+        function syncLineBindLinks() {
+            getLineBindButtons().forEach((btn) => {
+                if (publicConfig.lineLoginEnabled) {
+                    btn.href = buildLineLoginHref(isCartLineBindBtn(btn));
+                    btn.removeAttribute('aria-disabled');
+                    btn.classList.remove('pointer-events-none', 'opacity-50');
+                } else {
+                    btn.href = '#';
+                    btn.setAttribute('aria-disabled', 'true');
+                }
+            });
+        }
+
+        function handleLineBindClick(event) {
+            const bindBtn = event.target.closest('.js-line-bind-btn');
+            if (!bindBtn) return;
+
+            if (bindBtn.id === 'mobile-line-bind-btn') closeMobileMenu();
+
+            if (!publicConfig.lineLoginEnabled || bindBtn.getAttribute('aria-disabled') === 'true') {
+                event.preventDefault();
                 const hint = publicConfig.lineLoginConfigError || 'LINE 綁定尚未設定';
                 const cb = publicConfig.lineLoginCallbackUrl;
                 const detail = cb ? ` Callback：${cb}` : '';
@@ -625,21 +653,7 @@
                 return;
             }
 
-            getLineBindButtons().forEach((btn) => {
-                btn.disabled = true;
-                if (isCompactLineBindBtn(btn)) {
-                    const labelId = btn.id === 'nav-line-bind-btn' ? 'nav-line-bind-label' : 'cart-line-bind-label';
-                    const labelEl = document.getElementById(labelId);
-                    if (labelEl) labelEl.textContent = '…';
-                } else if (btn.id === 'mobile-line-bind-btn') {
-                    setFullLineBindLabel('mobile-line-bind-label', '前往 LINE…');
-                } else if (btn.id === 'cart-footer-line-bind-btn') {
-                    setFullLineBindLabel('cart-footer-line-bind-label', '前往 LINE 登入…');
-                }
-            });
-
-            const returnUrl = encodeURIComponent(getStorefrontReturnUrl({ openCart: isCartOpen() }));
-            window.location.assign(`${API_BASE}/api/line/login/start?returnUrl=${returnUrl}`);
+            // 使用 <a href> 原生導向，避免 iOS 以 JS 轉址時 LINE 顯示「無法正常執行」
         }
 
         // ============ Cart State ============
@@ -1073,12 +1087,7 @@
             document.getElementById('notify-preference').value = 'both';
         });
 
-        document.addEventListener('click', (event) => {
-            const bindBtn = event.target.closest('.js-line-bind-btn');
-            if (!bindBtn) return;
-            if (bindBtn.id === 'mobile-line-bind-btn') closeMobileMenu();
-            bindLineForNotifications();
-        });
+        document.addEventListener('click', handleLineBindClick);
 
         // ============ Init ============
         showLineBindButtons();

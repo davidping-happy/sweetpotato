@@ -49,6 +49,7 @@ function getStaticCallbackUrl() {
 
 function getPublicLineConfig() {
   const configured = isLineLoginConfigured();
+  const { channelId } = getLineLoginCredentials();
   let lineLoginConfigError = '';
   if (!configured) {
     lineLoginConfigError =
@@ -58,6 +59,7 @@ function getPublicLineConfig() {
   return {
     lineLoginEnabled: configured,
     lineLoginConfigError,
+    lineLoginChannelHint: channelId ? `…${channelId.slice(-4)}` : '',
     lineLoginCallbackUrl: getStaticCallbackUrl(),
     lineCustomerNotifyEnabled: Boolean(String(process.env.LINE_CHANNEL_ACCESS_TOKEN || '').trim()),
     lineBindMethod: 'login',
