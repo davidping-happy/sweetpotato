@@ -41,6 +41,12 @@ function isAllowedReturnUrl(rawUrl) {
   }
 }
 
+function getStaticCallbackUrl() {
+  const configured = String(process.env.LINE_LOGIN_CALLBACK_URL || '').trim();
+  if (configured) return configured.replace(/\/+$/, '');
+  return 'https://sweetpotato-api.onrender.com/api/line/login/callback';
+}
+
 function getPublicLineConfig() {
   const configured = isLineLoginConfigured();
   let lineLoginConfigError = '';
@@ -52,6 +58,7 @@ function getPublicLineConfig() {
   return {
     lineLoginEnabled: configured,
     lineLoginConfigError,
+    lineLoginCallbackUrl: getStaticCallbackUrl(),
     lineCustomerNotifyEnabled: Boolean(String(process.env.LINE_CHANNEL_ACCESS_TOKEN || '').trim()),
     lineBindMethod: 'login',
   };
@@ -61,6 +68,7 @@ module.exports = {
   getLineLoginCredentials,
   isLineLoginConfigured,
   getLineLoginCallbackUrl,
+  getStaticCallbackUrl,
   getDefaultStorefrontUrl,
   isAllowedReturnUrl,
   getPublicLineConfig,

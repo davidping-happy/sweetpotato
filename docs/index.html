@@ -440,6 +440,7 @@
         let publicConfig = {
             lineLoginEnabled: false,
             lineLoginConfigError: '',
+            lineLoginCallbackUrl: '',
             lineCustomerNotifyEnabled: false,
         };
 
@@ -529,14 +530,33 @@
             }
         }
 
-        function getStorefrontReturnUrl() {
-            return `${window.location.origin}${window.location.pathname}`;
+        function formatLineBindErrorMessage(raw) {
+            const msg = decodeURIComponent(String(raw || ''));
+            if (msg.includes('access_denied') || msg.includes('取消')) return '您已取消 LINE 登入';
+            if (msg.includes('Callback URL') || msg.includes('redirect_uri')) {
+                return msg;
+            }
+            if (msg.includes('無法正常執行') || msg.includes('LINE Login 設定') || msg.includes('invalid_client')) {
+                const cb = publicConfig.lineLoginCallbackUrl || 'https://sweetpotato-api.onrender.com/api/line/login/callback';
+                return `LINE 登入失敗：請確認使用「LINE Login」頻道，且 Callback URL 設為 ${cb}`;
+            }
+            return msg || 'LINE 綁定失敗，請稍後再試';
+        }
+
+        function getStorefrontReturnUrl(options = {}) {
+            const url = new URL(`${window.location.origin}${window.location.pathname}`);
+            if (options.openCart) url.searchParams.set('openCart', '1');
+            return url.toString();
+        }
+
+        function isCartOpen() {
+            return document.getElementById('cart-drawer')?.classList.contains('open');
         }
 
         function applyLineBindFromUrl() {
             const params = new URLSearchParams(window.location.search);
             const bindResult = params.get('lineBind');
-            if (!bindResult) return;
+            const shouldOpenCart = params.get('openCart') === '1';
 
             if (bindResult === 'ok') {
                 const userId = (params.get('lineUserId') || '').trim();
@@ -548,14 +568,18 @@
                     showToast('✅ LINE 綁定成功，可接收訂單通知');
                 }
             } else if (bindResult === 'error') {
-                const message = params.get('lineBindMessage') || 'LINE 綁定失敗';
+                const message = formatLineBindErrorMessage(params.get('lineBindMessage'));
                 updateLineBindUi(false, message);
                 showToast(`❌ ${message}`);
             }
 
-            ['lineBind', 'lineUserId', 'lineName', 'lineBindMessage'].forEach((key) => params.delete(key));
+            ['lineBind', 'lineUserId', 'lineName', 'lineBindMessage', 'openCart'].forEach((key) => params.delete(key));
             const qs = params.toString();
             window.history.replaceState({}, '', window.location.pathname + (qs ? `?${qs}` : ''));
+
+            if (shouldOpenCart && typeof openCart === 'function') {
+                openCart();
+            }
         }
 
         async function loadPublicConfig() {
@@ -565,6 +589,7 @@
                 publicConfig = {
                     lineLoginEnabled: Boolean(json.lineLoginEnabled),
                     lineLoginConfigError: String(json.lineLoginConfigError || '').trim(),
+                    lineLoginCallbackUrl: String(json.lineLoginCallbackUrl || '').trim(),
                     lineCustomerNotifyEnabled: Boolean(json.lineCustomerNotifyEnabled),
                 };
 
@@ -594,7 +619,9 @@
         function bindLineForNotifications() {
             if (!publicConfig.lineLoginEnabled) {
                 const hint = publicConfig.lineLoginConfigError || 'LINE 綁定尚未設定';
-                showToast(`⚠️ ${hint}`);
+                const cb = publicConfig.lineLoginCallbackUrl;
+                const detail = cb ? ` Callback：${cb}` : '';
+                showToast(`⚠️ ${hint}${detail}`);
                 return;
             }
 
@@ -611,8 +638,8 @@
                 }
             });
 
-            const returnUrl = encodeURIComponent(getStorefrontReturnUrl());
-            window.location.href = `${API_BASE}/api/line/login/start?returnUrl=${returnUrl}`;
+            const returnUrl = encodeURIComponent(getStorefrontReturnUrl({ openCart: isCartOpen() }));
+            window.location.assign(`${API_BASE}/api/line/login/start?returnUrl=${returnUrl}`);
         }
 
         // ============ Cart State ============

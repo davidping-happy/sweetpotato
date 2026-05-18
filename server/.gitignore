@@ -2,3 +2,4 @@ node_modules/
 .env
 data/orders.json
 data/admin-auth.json
+data/line-oauth-states.json
