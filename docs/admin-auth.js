@@ -80,18 +80,33 @@
     };
   }
 
-  async function requestPasswordReset() {
-    return {
-      data: null,
-      error: { message: '目前使用 Render 後端登入，請聯絡系統管理員重設密碼。' },
-    };
+  async function requestPasswordReset(email) {
+    const res = await fetch(apiUrl('/api/admin/forgot-password'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: normalizeValue(email) }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.success) {
+      return { data: null, error: { message: json.message || `HTTP ${res.status}` } };
+    }
+    return { data: { message: json.message }, error: null };
   }
 
-  async function updatePassword() {
-    return {
-      data: null,
-      error: { message: '目前使用 Render 後端登入，請聯絡系統管理員重設密碼。' },
-    };
+  async function resetPasswordWithToken(token, password) {
+    const res = await fetch(apiUrl('/api/admin/reset-password'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token: normalizeValue(token),
+        password: String(password || ''),
+      }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.success) {
+      return { data: null, error: { message: json.message || `HTTP ${res.status}` } };
+    }
+    return { data: { message: json.message, email: json.email }, error: null };
   }
 
   async function getAuthHeaders() {
@@ -123,7 +138,7 @@
     requireAdminSession,
     signInWithPassword,
     requestPasswordReset,
-    updatePassword,
+    resetPasswordWithToken,
     signOut,
   };
 })();

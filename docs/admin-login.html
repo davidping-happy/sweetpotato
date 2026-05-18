@@ -19,46 +19,101 @@
     .err { color: #c62828; }
     .muted { color: #777; }
     .inline-link { margin-top: 10px; font-size: 13px; color: #5d4037; text-decoration: underline; cursor: pointer; border: none; background: transparent; padding: 0; width: auto; }
+    .hidden { display: none; }
+    .panel-title { font-size: 16px; font-weight: 700; color: #5d4037; margin: 0 0 8px; }
   </style>
   <script src="./admin-auth.js"></script>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>後台登入</h1>
-      <p>請使用後台管理員帳號登入，未登入將無法進入後台。</p>
+      <h1 id="pageTitle">後台登入</h1>
+      <p id="pageDesc">請使用後台管理員帳號登入，未登入將無法進入後台。</p>
 
-      <form id="loginForm">
-        <label for="email">Email</label>
-        <input id="email" type="email" placeholder="admin@example.com" required />
+      <div id="loginPanel">
+        <form id="loginForm">
+          <label for="email">Email</label>
+          <input id="email" type="email" placeholder="admin@example.com" required />
 
-        <label for="password">Password</label>
-        <input id="password" type="password" placeholder="輸入密碼" required />
+          <label for="password">Password</label>
+          <input id="password" type="password" placeholder="輸入密碼" required />
 
-        <button id="loginBtn" type="submit">登入後台</button>
-      </form>
-      <button id="forgotBtn" type="button" class="inline-link">忘記密碼？請聯絡系統管理員</button>
+          <button id="loginBtn" type="submit">登入後台</button>
+        </form>
+        <button id="forgotBtn" type="button" class="inline-link">忘記密碼？寄送重設信件</button>
+      </div>
+
+      <div id="forgotPanel" class="hidden">
+        <p class="panel-title">忘記密碼</p>
+        <p>輸入管理員 Email，我們會寄送重設密碼連結（1 小時內有效）。</p>
+        <label for="forgotEmail">Email</label>
+        <input id="forgotEmail" type="email" placeholder="admin@example.com" required />
+        <button id="sendResetBtn" type="button">寄送重設信件</button>
+        <button id="backFromForgotBtn" type="button" class="inline-link">返回登入</button>
+      </div>
+
+      <div id="resetPanel" class="hidden">
+        <p class="panel-title">設定新密碼</p>
+        <p>請輸入新密碼（至少 6 碼），完成後即可登入後台。</p>
+        <label for="newPassword">新密碼</label>
+        <input id="newPassword" type="password" placeholder="至少 6 碼" minlength="6" required />
+        <label for="confirmPassword">確認新密碼</label>
+        <input id="confirmPassword" type="password" placeholder="再次輸入新密碼" minlength="6" required />
+        <button id="resetBtn" type="button">更新密碼</button>
+        <button id="backFromResetBtn" type="button" class="inline-link">返回登入</button>
+      </div>
 
       <div id="message" class="msg muted">請輸入管理員 Email / Password。</div>
     </div>
   </div>
 
   <script>
+    const loginPanel = document.getElementById('loginPanel');
+    const forgotPanel = document.getElementById('forgotPanel');
+    const resetPanel = document.getElementById('resetPanel');
+    const pageTitle = document.getElementById('pageTitle');
+    const pageDesc = document.getElementById('pageDesc');
     const form = document.getElementById('loginForm');
     const msg = document.getElementById('message');
     const loginBtn = document.getElementById('loginBtn');
     const forgotBtn = document.getElementById('forgotBtn');
     const emailInput = document.getElementById('email');
     const passwordInput = document.getElementById('password');
+    const forgotEmailInput = document.getElementById('forgotEmail');
+    const sendResetBtn = document.getElementById('sendResetBtn');
+    const backFromForgotBtn = document.getElementById('backFromForgotBtn');
+    const newPasswordInput = document.getElementById('newPassword');
+    const confirmPasswordInput = document.getElementById('confirmPassword');
+    const resetBtn = document.getElementById('resetBtn');
+    const backFromResetBtn = document.getElementById('backFromResetBtn');
     const redirectTarget = './admin.html';
+    const params = new URLSearchParams(window.location.search);
+    const resetToken = params.get('reset');
 
     function setMessage(text, cls) {
       msg.className = `msg ${cls || 'muted'}`;
       msg.textContent = text;
     }
 
+    function showPanel(name) {
+      loginPanel.classList.toggle('hidden', name !== 'login');
+      forgotPanel.classList.toggle('hidden', name !== 'forgot');
+      resetPanel.classList.toggle('hidden', name !== 'reset');
+
+      if (name === 'login') {
+        pageTitle.textContent = '後台登入';
+        pageDesc.textContent = '請使用後台管理員帳號登入，未登入將無法進入後台。';
+      } else if (name === 'forgot') {
+        pageTitle.textContent = '忘記密碼';
+        pageDesc.textContent = '我們會寄送重設連結到您的管理員信箱。';
+      } else if (name === 'reset') {
+        pageTitle.textContent = '重設密碼';
+        pageDesc.textContent = '請設定新的後台登入密碼。';
+      }
+    }
+
     function applyReasonMessage() {
-      const reason = new URLSearchParams(window.location.search).get('reason');
+      const reason = params.get('reason');
       if (reason === 'unauthorized') {
         setMessage('請先登入才能查看後台資料。', 'err');
       }
@@ -70,7 +125,7 @@
           loginPath: './admin-login.html',
           redirectOnFail: false,
         });
-        if (auth?.session) {
+        if (auth?.token) {
           window.location.replace(redirectTarget);
         }
       } catch (_) {
@@ -99,17 +154,87 @@
     });
 
     forgotBtn.addEventListener('click', () => {
-      const email = emailInput.value.trim();
-      if (!email) {
-        setMessage('請先輸入 Email，再聯絡管理員重設密碼。', 'err');
-        emailInput.focus();
-        return;
-      }
-      setMessage('此系統使用 Render 後端登入，請聯絡管理員於後台重設密碼。', 'muted');
+      forgotEmailInput.value = emailInput.value.trim();
+      showPanel('forgot');
+      setMessage('請輸入管理員 Email 後寄送重設信件。', 'muted');
+      forgotEmailInput.focus();
     });
 
-    loginBtn.disabled = false;
-    forgotBtn.disabled = false;
+    backFromForgotBtn.addEventListener('click', () => {
+      showPanel('login');
+      setMessage('請輸入管理員 Email / Password。', 'muted');
+    });
+
+    backFromResetBtn.addEventListener('click', () => {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('reset');
+      window.history.replaceState({}, '', url.pathname + url.search);
+      showPanel('login');
+      setMessage('請輸入管理員 Email / Password。', 'muted');
+    });
+
+    sendResetBtn.addEventListener('click', async () => {
+      const email = forgotEmailInput.value.trim();
+      if (!email) {
+        setMessage('請輸入 Email。', 'err');
+        forgotEmailInput.focus();
+        return;
+      }
+
+      sendResetBtn.disabled = true;
+      setMessage('寄送中...', 'muted');
+      try {
+        const { data, error } = await window.AdminAuth.requestPasswordReset(email);
+        if (error) throw error;
+        setMessage(data?.message || '若此 Email 為管理員帳號，重設信件已寄出。', 'ok');
+      } catch (err) {
+        setMessage(`寄送失敗：${err.message || '未知錯誤'}`, 'err');
+      } finally {
+        sendResetBtn.disabled = false;
+      }
+    });
+
+    resetBtn.addEventListener('click', async () => {
+      const password = newPasswordInput.value;
+      const confirm = confirmPasswordInput.value;
+      if (password.length < 6) {
+        setMessage('新密碼至少 6 碼。', 'err');
+        return;
+      }
+      if (password !== confirm) {
+        setMessage('兩次輸入的密碼不一致。', 'err');
+        return;
+      }
+      if (!resetToken) {
+        setMessage('重設連結無效，請重新申請。', 'err');
+        return;
+      }
+
+      resetBtn.disabled = true;
+      setMessage('更新中...', 'muted');
+      try {
+        const { data, error } = await window.AdminAuth.resetPasswordWithToken(resetToken, password);
+        if (error) throw error;
+        setMessage(data?.message || '密碼已重設，請使用新密碼登入。', 'ok');
+        const url = new URL(window.location.href);
+        url.searchParams.delete('reset');
+        window.history.replaceState({}, '', url.pathname + url.search);
+        showPanel('login');
+        emailInput.focus();
+      } catch (err) {
+        setMessage(`重設失敗：${err.message || '未知錯誤'}`, 'err');
+      } finally {
+        resetBtn.disabled = false;
+      }
+    });
+
+    if (resetToken) {
+      showPanel('reset');
+      setMessage('請輸入新密碼並確認。', 'muted');
+    } else {
+      showPanel('login');
+    }
+
     applyReasonMessage();
     checkExistingSession();
   </script>
