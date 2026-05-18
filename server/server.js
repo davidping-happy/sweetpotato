@@ -10,6 +10,7 @@ const seedProducts = require('./seed/products');
 const productsRouter = require('./routes/products');
 const ordersRouter = require('./routes/orders');
 const adminAuthRouter = require('./routes/adminAuth');
+const lineAuthRouter = require('./routes/lineAuth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -59,15 +60,16 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'docs')));
 
 // ============ 公開設定（不含密鑰） ============
-const { getPublicLiffConfig } = require('./utils/liffConfig');
+const { getPublicLineConfig } = require('./utils/lineLoginConfig');
 
 app.get('/api/config', (req, res) => {
-  res.json(getPublicLiffConfig());
+  res.json(getPublicLineConfig());
 });
 
 // ============ API 路由 ============
 app.use('/api/products', productsRouter);
 app.use('/api/admin', adminAuthRouter);
+app.use('/api/line', lineAuthRouter);
 app.use('/api/orders', ordersRouter);
 
 // ============ 健康檢查 ============

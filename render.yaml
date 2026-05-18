@@ -31,6 +31,12 @@ services:
         sync: false
       - key: LINE_SHOP_USER_ID
         sync: false
+      - key: LINE_LOGIN_CHANNEL_ID
+        sync: false
+      - key: LINE_LOGIN_CHANNEL_SECRET
+        sync: false
+      - key: LINE_STOREFRONT_URL
+        sync: false
       - key: LINE_LIFF_ID
         sync: false
       - key: LINE_NOTIFY_WEBHOOK_URL
