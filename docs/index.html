@@ -420,7 +420,49 @@
             return DEFAULT_CLOUD_API;
         })();
         const productIdByName = {};
-        let publicConfig = { lineLiffId: '', lineCustomerNotifyEnabled: false };
+        const LINE_USER_ID_KEY = 'sweetpotato_line_user_id';
+        let publicConfig = {
+            lineLiffId: '',
+            lineLiffIdValid: false,
+            lineLiffConfigError: '',
+            lineCustomerNotifyEnabled: false,
+        };
+
+        function applySavedLineUserId() {
+            const saved = (localStorage.getItem(LINE_USER_ID_KEY) || '').trim();
+            if (!saved) return false;
+            document.getElementById('cust-line-user-id').value = saved;
+            updateLineBindUi(true, '已使用先前綁定的 LINE');
+            return true;
+        }
+
+        function updateLineBindUi(bound, statusText) {
+            const bindBtn = document.getElementById('line-bind-btn');
+            const bindStatus = document.getElementById('line-bind-status');
+            bindStatus.style.display = 'block';
+            bindStatus.textContent = statusText || (bound ? 'LINE 已綁定，可接收訂單通知' : '選擇「Email + 我的 LINE」時，請先綁定 LINE。');
+            bindBtn.textContent = bound ? '已綁定 LINE ✓' : '綁定 LINE 接收訂單通知';
+        }
+
+        function showLineBindUnavailable(message) {
+            const bindBtn = document.getElementById('line-bind-btn');
+            const bindStatus = document.getElementById('line-bind-status');
+            bindBtn.style.display = 'none';
+            bindStatus.style.display = 'block';
+            bindStatus.className = 'text-xs text-amber-700';
+            bindStatus.textContent = message || 'LINE 綁定暫不可用，請改選 Email 確認信。';
+        }
+
+        async function completeLineBindFromProfile() {
+            const profile = await window.liff.getProfile();
+            const userId = String(profile.userId || '').trim();
+            if (!userId) throw new Error('無法取得 LINE 使用者 ID');
+            localStorage.setItem(LINE_USER_ID_KEY, userId);
+            document.getElementById('cust-line-user-id').value = userId;
+            updateLineBindUi(true, `已綁定 LINE：${profile.displayName || '完成'}`);
+            showToast('✅ LINE 綁定成功，可接收訂單通知');
+            return userId;
+        }
 
         async function loadPublicConfig() {
             try {
@@ -428,47 +470,91 @@
                 const json = await res.json().catch(() => ({}));
                 publicConfig = {
                     lineLiffId: String(json.lineLiffId || '').trim(),
+                    lineLiffIdValid: Boolean(json.lineLiffIdValid),
+                    lineLiffConfigError: String(json.lineLiffConfigError || '').trim(),
                     lineCustomerNotifyEnabled: Boolean(json.lineCustomerNotifyEnabled),
                 };
+
                 const bindBtn = document.getElementById('line-bind-btn');
                 const bindStatus = document.getElementById('line-bind-status');
-                if (publicConfig.lineLiffId) {
-                    bindBtn.style.display = 'block';
-                    bindStatus.style.display = 'block';
-                    bindStatus.textContent = '選擇「Email + 我的 LINE」時，請先綁定 LINE。';
+                bindStatus.className = 'text-xs text-secondary/80';
+
+                if (publicConfig.lineLiffConfigError) {
+                    showLineBindUnavailable(`${publicConfig.lineLiffConfigError} 目前請改選「Email 確認信」。`);
+                    return;
+                }
+
+                if (!publicConfig.lineLiffIdValid) {
+                    showLineBindUnavailable('店家尚未完成 LINE 綁定設定，請改選「Email 確認信」。');
+                    return;
+                }
+
+                bindBtn.style.display = 'block';
+                bindStatus.style.display = 'block';
+                if (applySavedLineUserId()) {
+                    return;
+                }
+                updateLineBindUi(false);
+                await tryAutoLineBindOnLoad();
+            } catch (_) {
+                showLineBindUnavailable('無法載入 LINE 設定，請改選 Email 確認信。');
+            }
+        }
+
+        async function tryAutoLineBindOnLoad() {
+            if (!publicConfig.lineLiffIdValid || !window.liff) return;
+            try {
+                await window.liff.init({ liffId: publicConfig.lineLiffId });
+                if (window.liff.isLoggedIn()) {
+                    await completeLineBindFromProfile();
                 }
             } catch (_) {
-                // ignore
+                // 一般瀏器開啟時無法自動綁定，需使用者點按鈕導向 LINE
             }
         }
 
         async function bindLineForNotifications() {
             const bindBtn = document.getElementById('line-bind-btn');
             const bindStatus = document.getElementById('line-bind-status');
-            if (!publicConfig.lineLiffId) {
-                showToast('⚠️ 尚未設定 LINE 綁定（LINE_LIFF_ID）');
+
+            if (!publicConfig.lineLiffIdValid) {
+                showToast('⚠️ LINE 綁定尚未正確設定，請改選 Email 確認信');
                 return;
             }
             if (!window.liff) {
                 showToast('⚠️ LINE SDK 載入中，請稍後再試');
                 return;
             }
+
             bindBtn.disabled = true;
             bindStatus.textContent = 'LINE 綁定中...';
+            bindStatus.className = 'text-xs text-secondary/80';
+
             try {
                 await window.liff.init({ liffId: publicConfig.lineLiffId });
-                if (!window.liff.isLoggedIn()) {
-                    window.liff.login();
+
+                const inLineApp = window.liff.isInClient();
+                if (!inLineApp && !window.liff.isLoggedIn()) {
+                    bindStatus.textContent = '正在開啟 LINE 進行綁定...';
+                    window.location.href = `https://liff.line.me/${publicConfig.lineLiffId}`;
                     return;
                 }
-                const profile = await window.liff.getProfile();
-                document.getElementById('cust-line-user-id').value = profile.userId || '';
-                bindStatus.textContent = `已綁定 LINE：${profile.displayName || '完成'}`;
-                bindBtn.textContent = '已綁定 LINE ✓';
-                showToast('✅ LINE 綁定成功，可接收訂單通知');
+
+                if (!window.liff.isLoggedIn()) {
+                    window.liff.login({ redirectUri: window.location.href.split('#')[0] });
+                    return;
+                }
+
+                await completeLineBindFromProfile();
             } catch (err) {
-                bindStatus.textContent = 'LINE 綁定失敗，請重試';
-                showToast(`❌ LINE 綁定失敗：${err.message || '未知錯誤'}`);
+                const msg = String(err.message || '未知錯誤');
+                if (msg.includes('not found')) {
+                    showLineBindUnavailable('LINE LIFF ID 無效（可能誤填 Channel ID）。請改選 Email 確認信，或聯絡店家修正設定。');
+                    showToast('❌ LINE 設定錯誤：LIFF ID 無效');
+                } else {
+                    bindStatus.textContent = 'LINE 綁定失敗，請重試或改選 Email';
+                    showToast(`❌ LINE 綁定失敗：${msg}`);
+                }
             } finally {
                 bindBtn.disabled = false;
             }
@@ -755,8 +841,11 @@
             if ((fields.notifyPreference === 'email' || fields.notifyPreference === 'both') && !fields.email) {
                 return '選擇 Email 確認信時，請填寫 Email';
             }
-            if (fields.notifyPreference === 'both' && publicConfig.lineLiffId && !fields.lineUserId) {
-                return '請先點「綁定 LINE 接收訂單通知」';
+            if (fields.notifyPreference === 'both' && publicConfig.lineLiffIdValid && !fields.lineUserId) {
+                return '請先點「綁定 LINE 接收訂單通知」（或改選 Email 確認信）';
+            }
+            if (fields.notifyPreference === 'both' && !publicConfig.lineLiffIdValid && !fields.email) {
+                return 'LINE 綁定尚未設定完成，請填寫 Email 或改選其他通知方式';
             }
             return '';
         }
@@ -895,12 +984,10 @@
             ['cust-name', 'cust-phone', 'cust-email', 'cust-address'].forEach(id => {
                 document.getElementById(id).value = '';
             });
-            document.getElementById('cust-line-user-id').value = '';
-            document.getElementById('line-bind-status').textContent = publicConfig.lineLiffId
-                ? '選擇「Email + 我的 LINE」時，請先綁定 LINE。'
-                : '';
-            const bindBtn = document.getElementById('line-bind-btn');
-            if (bindBtn) bindBtn.textContent = '綁定 LINE 接收訂單通知';
+            if (publicConfig.lineLiffIdValid) {
+                document.getElementById('cust-line-user-id').value = localStorage.getItem(LINE_USER_ID_KEY) || '';
+                updateLineBindUi(Boolean(document.getElementById('cust-line-user-id').value));
+            }
             document.getElementById('notify-preference').value = 'both';
         });
 

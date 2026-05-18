@@ -59,11 +59,10 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'docs')));
 
 // ============ 公開設定（不含密鑰） ============
+const { getPublicLiffConfig } = require('./utils/liffConfig');
+
 app.get('/api/config', (req, res) => {
-  res.json({
-    lineLiffId: String(process.env.LINE_LIFF_ID || '').trim(),
-    lineCustomerNotifyEnabled: Boolean(String(process.env.LINE_CHANNEL_ACCESS_TOKEN || '').trim()),
-  });
+  res.json(getPublicLiffConfig());
 });
 
 // ============ API 路由 ============
