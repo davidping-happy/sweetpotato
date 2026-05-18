@@ -16,7 +16,7 @@ services:
       - key: ADMIN_JWT_SECRET
         sync: false
       - key: ADMIN_APP_URL
-        sync: false
+        value: https://sweetpotato-api.onrender.com
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT
@@ -36,9 +36,9 @@ services:
       - key: LINE_LOGIN_CHANNEL_SECRET
         sync: false
       - key: LINE_STOREFRONT_URL
-        sync: false
-      - key: LINE_LIFF_ID
-        sync: false
+        value: https://davidping-happy.github.io/sweetpotato/docs/index.html
+      - key: LINE_LOGIN_CALLBACK_URL
+        value: https://sweetpotato-api.onrender.com/api/line/login/callback
       - key: LINE_NOTIFY_WEBHOOK_URL
         sync: false
       # Optional: set this in Render dashboard if using MongoDB Atlas
