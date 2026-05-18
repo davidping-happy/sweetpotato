@@ -87,8 +87,11 @@
                 <a class="hover:text-primary transition-colors" href="#products">精選產品</a>
                 <a class="hover:text-primary transition-colors" href="#story">品牌故事</a>
             </div>
-            <div class="flex items-center gap-4">
-                <button class="relative text-primary p-2 hover:bg-primary/10 rounded-full transition-colors" id="open-cart-btn">
+            <div class="flex items-center gap-2 sm:gap-3">
+                <button type="button" id="nav-line-bind-btn" style="display:none;" class="inline-flex items-center gap-1 px-2.5 py-1.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-full border-2 border-[#06C755] text-[#06C755] hover:bg-[#06C755]/10 active:scale-[0.98] transition-all whitespace-nowrap" title="綁定後可於 LINE 接收訂單通知">
+                    綁定 LINE 通知
+                </button>
+                <button class="relative text-primary p-2 hover:bg-primary/10 rounded-full transition-colors shrink-0" id="open-cart-btn">
                     <i data-lucide="shopping-cart"></i>
                     <span class="absolute top-0 right-0 bg-primary text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full border-2 border-background cart-count" style="display:none;">0</span>
                 </button>
@@ -109,6 +112,9 @@
             <a class="text-primary hover:opacity-80 transition-opacity py-2" href="#" id="mobile-nav-home">首頁</a>
             <a class="hover:text-primary transition-colors py-2" href="#products" id="mobile-nav-products">精選產品</a>
             <a class="hover:text-primary transition-colors py-2" href="#story" id="mobile-nav-story">品牌故事</a>
+            <button type="button" id="mobile-line-bind-btn" style="display:none;" class="mt-2 w-full py-3 rounded-xl border-2 border-[#06C755] text-[#06C755] font-bold text-sm hover:bg-[#06C755]/10 transition-colors">
+                綁定 LINE 通知
+            </button>
         </div>
     </div>
 
@@ -161,10 +167,7 @@
                     <option value="none">不通知</option>
                 </select>
                 <input id="cust-line-user-id" type="hidden" value="" />
-                <button type="button" id="line-bind-btn" style="display:none;" class="w-full py-2.5 border border-primary/40 text-primary text-sm font-semibold rounded-lg hover:bg-primary/5">
-                    綁定 LINE 接收訂單通知
-                </button>
-                <p id="line-bind-status" class="text-xs text-secondary/80" style="display:none;"></p>
+                <p id="checkout-line-hint" class="text-xs text-secondary/80" style="display:none;"></p>
                 <p id="checkout-validation" class="text-xs text-red-600"></p>
             </div>
 
@@ -434,21 +437,47 @@
             return true;
         }
 
+        function getLineBindButtons() {
+            return [
+                document.getElementById('nav-line-bind-btn'),
+                document.getElementById('mobile-line-bind-btn'),
+            ].filter(Boolean);
+        }
+
         function updateLineBindUi(bound, statusText) {
-            const bindBtn = document.getElementById('line-bind-btn');
-            const bindStatus = document.getElementById('line-bind-status');
-            bindStatus.style.display = 'block';
-            bindStatus.textContent = statusText || (bound ? 'LINE 已綁定，可接收訂單通知' : '選擇「Email + 我的 LINE」時，請先綁定 LINE。');
-            bindBtn.textContent = bound ? '已綁定 LINE ✓' : '綁定 LINE 接收訂單通知';
+            const label = bound ? 'LINE 已綁定 ✓' : '綁定 LINE 通知';
+            getLineBindButtons().forEach((btn) => {
+                const isNav = btn.id === 'nav-line-bind-btn';
+                btn.style.display = isNav ? 'inline-flex' : 'block';
+                btn.textContent = label;
+                btn.disabled = bound;
+                btn.classList.toggle('opacity-70', bound);
+                btn.classList.toggle('cursor-default', bound);
+                btn.classList.toggle('hover:bg-[#06C755]/10', !bound);
+            });
+
+            const checkoutHint = document.getElementById('checkout-line-hint');
+            if (!checkoutHint) return;
+            checkoutHint.style.display = 'block';
+            if (bound) {
+                checkoutHint.className = 'text-xs text-green-700';
+                checkoutHint.textContent = statusText || '已綁定 LINE，結帳時可選「Email + 我的 LINE」接收通知。';
+            } else {
+                checkoutHint.className = 'text-xs text-secondary/80';
+                checkoutHint.textContent = statusText || '欲接收 LINE 訂單通知，請先點右上角「綁定 LINE 通知」。';
+            }
         }
 
         function showLineBindUnavailable(message) {
-            const bindBtn = document.getElementById('line-bind-btn');
-            const bindStatus = document.getElementById('line-bind-status');
-            bindBtn.style.display = 'none';
-            bindStatus.style.display = 'block';
-            bindStatus.className = 'text-xs text-amber-700';
-            bindStatus.textContent = message || 'LINE 綁定暫不可用，請改選 Email 確認信。';
+            getLineBindButtons().forEach((btn) => {
+                btn.style.display = 'none';
+            });
+            const checkoutHint = document.getElementById('checkout-line-hint');
+            if (checkoutHint) {
+                checkoutHint.style.display = 'block';
+                checkoutHint.className = 'text-xs text-amber-700';
+                checkoutHint.textContent = message || 'LINE 綁定暫不可用，請改選 Email 確認信。';
+            }
         }
 
         function getStorefrontReturnUrl() {
@@ -490,10 +519,6 @@
                     lineCustomerNotifyEnabled: Boolean(json.lineCustomerNotifyEnabled),
                 };
 
-                const bindBtn = document.getElementById('line-bind-btn');
-                const bindStatus = document.getElementById('line-bind-status');
-                bindStatus.className = 'text-xs text-secondary/80';
-
                 applyLineBindFromUrl();
 
                 if (!publicConfig.lineLoginEnabled) {
@@ -502,8 +527,14 @@
                     return;
                 }
 
-                bindBtn.style.display = 'block';
-                bindStatus.style.display = 'block';
+                getLineBindButtons().forEach((btn) => {
+                    if (btn.id === 'nav-line-bind-btn') {
+                        btn.style.display = 'inline-flex';
+                    } else {
+                        btn.style.display = 'block';
+                    }
+                });
+
                 if (!document.getElementById('cust-line-user-id').value && applySavedLineUserId()) {
                     return;
                 }
@@ -516,16 +547,17 @@
         }
 
         function bindLineForNotifications() {
-            const bindBtn = document.getElementById('line-bind-btn');
-            const bindStatus = document.getElementById('line-bind-status');
-
             if (!publicConfig.lineLoginEnabled) {
                 showToast('⚠️ LINE 綁定尚未設定，請改選 Email 確認信');
                 return;
             }
 
-            bindBtn.disabled = true;
-            bindStatus.textContent = '正在前往 LINE 登入...';
+            getLineBindButtons().forEach((btn) => {
+                btn.disabled = true;
+                if (btn.id === 'nav-line-bind-btn') btn.textContent = '前往 LINE…';
+                else btn.textContent = '正在前往 LINE 登入…';
+            });
+
             const returnUrl = encodeURIComponent(getStorefrontReturnUrl());
             window.location.href = `${API_BASE}/api/line/login/start?returnUrl=${returnUrl}`;
         }
@@ -812,7 +844,7 @@
                 return '選擇 Email 確認信時，請填寫 Email';
             }
             if (fields.notifyPreference === 'both' && publicConfig.lineLoginEnabled && !fields.lineUserId) {
-                return '請先點「綁定 LINE 接收訂單通知」（或改選 Email 確認信）';
+                return '請先於首頁右上角「綁定 LINE 通知」（或改選 Email 確認信）';
             }
             if (fields.notifyPreference === 'both' && !publicConfig.lineLoginEnabled && !fields.email) {
                 return 'LINE 綁定尚未設定完成，請填寫 Email 或改選其他通知方式';
@@ -961,7 +993,11 @@
             document.getElementById('notify-preference').value = 'both';
         });
 
-        document.getElementById('line-bind-btn').addEventListener('click', bindLineForNotifications);
+        document.getElementById('nav-line-bind-btn').addEventListener('click', bindLineForNotifications);
+        document.getElementById('mobile-line-bind-btn').addEventListener('click', () => {
+            bindLineForNotifications();
+            closeMobileMenu();
+        });
 
         // ============ Init ============
         updateCartUI();
