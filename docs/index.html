@@ -494,11 +494,18 @@
                 } else if (btn.id === 'cart-footer-line-bind-btn') {
                     setFullLineBindLabel('cart-footer-line-bind-label', fullLabel);
                 }
-                btn.disabled = bound;
-                btn.classList.toggle('opacity-70', bound);
-                btn.classList.toggle('cursor-default', bound);
-                btn.classList.toggle('hover:bg-[#06C755]/15', !bound);
+                if (bound) {
+                    btn.setAttribute('aria-disabled', 'true');
+                    btn.classList.add('opacity-70', 'cursor-default', 'pointer-events-none');
+                    btn.classList.remove('hover:bg-[#06C755]/15');
+                    btn.removeAttribute('href');
+                } else {
+                    btn.removeAttribute('aria-disabled');
+                    btn.classList.remove('opacity-70', 'cursor-default', 'pointer-events-none');
+                    btn.classList.add('hover:bg-[#06C755]/15');
+                }
             });
+            if (!bound) syncLineBindLinks();
 
             const checkoutHint = document.getElementById('checkout-line-hint');
             if (!checkoutHint) return;
@@ -520,9 +527,11 @@
             setFullLineBindLabel('mobile-line-bind-label', '綁定 LINE 通知');
             setFullLineBindLabel('cart-footer-line-bind-label', '綁定 LINE 通知');
             getLineBindButtons().forEach((btn) => {
-                btn.disabled = false;
+                btn.removeAttribute('aria-disabled');
+                btn.classList.remove('pointer-events-none', 'opacity-70');
                 btn.title = message || 'LINE 綁定暫不可用';
             });
+            syncLineBindLinks();
             const checkoutHint = document.getElementById('checkout-line-hint');
             if (checkoutHint) {
                 checkoutHint.style.display = 'block';
@@ -610,6 +619,7 @@
                 }
             } catch (_) {
                 showLineBindUnavailable('無法載入 LINE 設定，請改選 Email 確認信。');
+                syncLineBindLinks();
             } finally {
                 if (typeof lucide !== 'undefined') lucide.createIcons();
             }
@@ -653,7 +663,22 @@
                 return;
             }
 
-            // 使用 <a href> 原生導向，避免 iOS 以 JS 轉址時 LINE 顯示「無法正常執行」
+            const loginUrl = (bindBtn.getAttribute('href') || '').trim();
+            if (!loginUrl || loginUrl === '#') {
+                event.preventDefault();
+                syncLineBindLinks();
+                const retryUrl = (bindBtn.getAttribute('href') || '').trim();
+                if (retryUrl && retryUrl !== '#') {
+                    window.location.assign(retryUrl);
+                } else {
+                    showToast('⚠️ 無法啟動 LINE 登入，請重新整理頁面後再試');
+                }
+                return;
+            }
+
+            // 攔截舊版 smooth-scroll 對 href="#" 綁定的 preventDefault，確保能導向 LINE
+            event.preventDefault();
+            window.location.assign(loginUrl);
         }
 
         // ============ Cart State ============
@@ -895,7 +920,7 @@
         });
 
         // ============ Smooth Scrolling ============
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+        document.querySelectorAll('a[href^="#"]:not(.js-line-bind-btn)').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
                 e.preventDefault();
                 const target = document.querySelector(this.getAttribute('href'));
