@@ -122,6 +122,17 @@ async function startServer() {
         console.log(`🌱 已自動寫入 ${seedProducts.length} 筆商品初始資料`);
       } else {
         console.log(`📦 目前有 ${count} 筆商品`);
+        // 確保地瓜糖商品圖片與 seed 一致（修正資料庫中錯誤的 imageUrl）
+        for (const seed of seedProducts) {
+          if (!seed.name.includes('地瓜糖') || !seed.imageUrl) continue;
+          const updated = await Product.updateOne(
+            { name: seed.name },
+            { $set: { imageUrl: seed.imageUrl } },
+          );
+          if (updated.modifiedCount > 0) {
+            console.log(`🖼️ 已更新「${seed.name}」商品圖片`);
+          }
+        }
       }
     }
 

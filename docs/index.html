@@ -253,7 +253,7 @@
                 <!-- Product Card 2 -->
                 <div class="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow border border-outline/10 flex flex-col" data-product-id="2">
                     <div class="relative aspect-[4/5] overflow-hidden">
-                        <img alt="手作地瓜糖(小盒)" class="w-full h-full object-cover hover:scale-105 transition-transform duration-500" src="https://cdn.jsdelivr.net/gh/davidping-happy/sweetpotato@main/photo/005.png" />
+                        <img alt="手作地瓜糖(小盒)" class="w-full h-full object-cover hover:scale-105 transition-transform duration-500" src="https://cdn.jsdelivr.net/gh/davidping-happy/sweetpotato@main/photo/005.png?v=20260520" />
                     </div>
                     <div class="p-6 flex flex-col flex-1">
                         <h4 class="text-xl font-bold text-secondary mb-2">手作地瓜糖(小盒)</h4>
@@ -261,7 +261,7 @@
                         <div class="flex items-center justify-between mt-auto">
                             <span class="text-2xl font-bold text-primary">NT$45</span>
                             <button class="add-to-cart-btn bg-secondary text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-primary transition-colors active:scale-95"
-                                data-name="手作地瓜糖(小盒)" data-price="45" data-img="https://cdn.jsdelivr.net/gh/davidping-happy/sweetpotato@main/photo/005.png" data-desc="小盒 45 元">
+                                data-name="手作地瓜糖(小盒)" data-price="45" data-img="https://cdn.jsdelivr.net/gh/davidping-happy/sweetpotato@main/photo/005.png?v=20260520" data-desc="小盒 45 元">
                                 <i class="w-4 h-4" data-lucide="shopping-cart"></i> 加入購物車
                             </button>
                         </div>
@@ -289,7 +289,7 @@
                 <!-- Product Card 4 -->
                 <div class="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow border border-outline/10 flex flex-col" data-product-id="4">
                     <div class="relative aspect-[4/5] overflow-hidden">
-                        <img alt="手作地瓜糖（大盒）" class="w-full h-full object-cover hover:scale-105 transition-transform duration-500" src="https://cdn.jsdelivr.net/gh/davidping-happy/sweetpotato@main/photo/005.png" />
+                        <img alt="手作地瓜糖（大盒）" class="w-full h-full object-cover hover:scale-105 transition-transform duration-500" src="https://cdn.jsdelivr.net/gh/davidping-happy/sweetpotato@main/photo/005.png?v=20260520" />
                     </div>
                     <div class="p-6 flex flex-col flex-1">
                         <h4 class="text-xl font-bold text-secondary mb-2">手作地瓜糖（大盒）</h4>
@@ -297,7 +297,7 @@
                         <div class="flex items-center justify-between mt-auto">
                             <span class="text-2xl font-bold text-primary">NT$65</span>
                             <button class="add-to-cart-btn bg-secondary text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-primary transition-colors active:scale-95"
-                                data-name="手作地瓜糖（大盒）" data-price="65" data-img="https://cdn.jsdelivr.net/gh/davidping-happy/sweetpotato@main/photo/005.png" data-desc="大盒 65 元">
+                                data-name="手作地瓜糖（大盒）" data-price="65" data-img="https://cdn.jsdelivr.net/gh/davidping-happy/sweetpotato@main/photo/005.png?v=20260520" data-desc="大盒 65 元">
                                 <i class="w-4 h-4" data-lucide="shopping-cart"></i> 加入購物車
                             </button>
                         </div>
@@ -786,6 +786,7 @@
 
         // ============ Load Products from API ============
         const IMAGE_CDN_BASE = 'https://cdn.jsdelivr.net/gh/davidping-happy/sweetpotato@main/';
+        const SWEET_POTATO_CANDY_IMAGE = `${IMAGE_CDN_BASE}photo/005.png?v=20260520`;
 
         function normalizeImagePath(path) {
             if (!path || typeof path !== 'string') return '';
@@ -824,8 +825,10 @@
                     btn.dataset.productId = product._id;
                     btn.dataset.name = product.name;
                     btn.dataset.price = product.price;
-                    if (product.imageUrl) {
-                        const imageUrl = normalizeImagePath(product.imageUrl);
+                    const imageUrl = key.includes('地瓜糖')
+                        ? SWEET_POTATO_CANDY_IMAGE
+                        : (product.imageUrl ? normalizeImagePath(product.imageUrl) : '');
+                    if (imageUrl) {
                         btn.dataset.img = imageUrl;
                         const cardImg = btn.closest('[data-product-id]')?.querySelector('img');
                         if (cardImg) cardImg.src = imageUrl;
