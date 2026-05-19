@@ -793,6 +793,14 @@
             return IMAGE_CDN_BASE + path.replace(/^\/+/, '');
         }
 
+        function normalizeProductName(name) {
+            return String(name || '')
+                .trim()
+                .toLowerCase()
+                .replace(/[（）]/g, (ch) => (ch === '（' ? '(' : ')'))
+                .replace(/\s+/g, '');
+        }
+
         async function loadProducts() {
             try {
                 const res = await fetch(`${API_BASE}/api/products`);
@@ -803,21 +811,24 @@
                 // Update existing cards' add-to-cart buttons with productId from DB
                 const products = json.data;
                 const buttons = grid.querySelectorAll('.add-to-cart-btn');
-                const images = grid.querySelectorAll('div[data-product-id] img');
-
-                products.forEach((product, i) => {
+                products.forEach((product) => {
                     if (product?.name && product?._id) {
                         productIdByName[product.name] = product._id;
                     }
-                    if (buttons[i]) {
-                        buttons[i].dataset.productId = product._id;
-                        buttons[i].dataset.name = product.name;
-                        buttons[i].dataset.price = product.price;
-                        if (product.imageUrl) {
-                            const imageUrl = normalizeImagePath(product.imageUrl);
-                            buttons[i].dataset.img = imageUrl;
-                            if (images[i]) images[i].src = imageUrl;
-                        }
+                    const key = normalizeProductName(product.name);
+                    const btn = Array.from(buttons).find(
+                        (b) => normalizeProductName(b.dataset.name) === key,
+                    );
+                    if (!btn) return;
+
+                    btn.dataset.productId = product._id;
+                    btn.dataset.name = product.name;
+                    btn.dataset.price = product.price;
+                    if (product.imageUrl) {
+                        const imageUrl = normalizeImagePath(product.imageUrl);
+                        btn.dataset.img = imageUrl;
+                        const cardImg = btn.closest('[data-product-id]')?.querySelector('img');
+                        if (cardImg) cardImg.src = imageUrl;
                     }
                 });
                 console.log(`✅ 已從 API 載入 ${products.length} 筆商品`);
