@@ -50,6 +50,21 @@
         <button id="testApiBtn" class="secondary">測試連線</button>
         <span id="status" class="muted">尚未載入</span>
       </div>
+      <div class="row" style="margin-top: 10px;">
+        <select id="statusFilter">
+          <option value="">全部狀態</option>
+          <option value="pending">待處理</option>
+          <option value="shipped">已出貨</option>
+          <option value="completed">已完成</option>
+        </select>
+        <select id="timeSort">
+          <option value="created_desc">時間排序：新到舊</option>
+          <option value="created_asc">時間排序：舊到新</option>
+          <option value="updated_desc">最近更新：新到舊</option>
+          <option value="updated_asc">最近更新：舊到新</option>
+        </select>
+        <input id="keywordSearch" placeholder="關鍵字搜尋（訂單編號/姓名/電話/地址/品名）" style="min-width: 300px;" />
+      </div>
       <table>
         <thead>
           <tr>
@@ -100,6 +115,10 @@
     const orderTimeline = document.getElementById('orderTimeline');
     const operatorInput = document.getElementById('operatorInput');
     const apiBaseInput = document.getElementById('apiBaseInput');
+    const statusFilter = document.getElementById('statusFilter');
+    const timeSort = document.getElementById('timeSort');
+    const keywordSearch = document.getElementById('keywordSearch');
+    let allOrders = [];
     const statusTransitions = {
       pending: ['pending', 'confirmed', 'cancelled'],
       confirmed: ['confirmed', 'shipped', 'cancelled'],
@@ -181,6 +200,84 @@
       return allowed.map(s => `<option value="${s}" ${s === current ? 'selected' : ''}>${s}</option>`).join('');
     }
 
+    function toMillis(value) {
+      const ts = new Date(value || '').getTime();
+      return Number.isNaN(ts) ? 0 : ts;
+    }
+
+    function normalizeText(value) {
+      return String(value || '').trim().toLowerCase();
+    }
+
+    function orderSearchText(order) {
+      const details = Array.isArray(order.itemDetails) ? order.itemDetails : [];
+      const itemNames = details.map((it) => it?.name || '').join(' ');
+      return normalizeText([
+        order.orderNumber,
+        order.status,
+        order.customer?.name,
+        order.customer?.phone,
+        order.customer?.address,
+        itemNames,
+      ].join(' '));
+    }
+
+    function renderOrders(orders) {
+      const rows = orders.map(o => {
+        const details = Array.isArray(o.itemDetails) ? o.itemDetails : [];
+        const detailsHtml = details.length
+          ? details.map((it) => `${it.name || '-'} x${Number(it.quantity || 0)} @ NT$${Number(it.price || 0)}`).join('<br>')
+          : '-';
+        return `
+          <tr>
+            <td>${o.orderNumber || '-'}</td>
+            <td>${fmtDate(o.createdAt)}</td>
+            <td>${detailsHtml}</td>
+            <td>${o.customer?.name || '-'}</td>
+            <td>${o.customer?.address || '-'}</td>
+            <td>${o.customer?.phone || '-'}</td>
+            <td>NT$${o.total ?? 0}</td>
+            <td>${o.status || '-'}</td>
+            <td>${o.lastStatusBy || '-'}<br><span class="muted">${fmtDate(o.lastStatusAt)}</span></td>
+            <td>
+              <div class="row">
+                <button class="secondary" onclick="viewOrderDetail('${o.orderNumber}')">查看明細</button>
+                <select id="status-${o.orderNumber}">
+                  ${statusOptions(o.status)}
+                </select>
+                <button class="secondary" onclick="updateStatus('${o.orderNumber}')">更新</button>
+              </div>
+            </td>
+          </tr>
+        `;
+      }).join('');
+      ordersBody.innerHTML = rows || '<tr><td colspan="11" class="muted">目前沒有符合條件的訂單</td></tr>';
+    }
+
+    function applyOrderFilters() {
+      const statusValue = normalizeText(statusFilter.value);
+      const keyword = normalizeText(keywordSearch.value);
+      const sortValue = timeSort.value || 'created_desc';
+      let filtered = allOrders.filter((o) => {
+        if (statusValue && normalizeText(o.status) !== statusValue) return false;
+        if (keyword && !orderSearchText(o).includes(keyword)) return false;
+        return true;
+      });
+
+      const sorters = {
+        created_desc: (a, b) => toMillis(b.createdAt) - toMillis(a.createdAt),
+        created_asc: (a, b) => toMillis(a.createdAt) - toMillis(b.createdAt),
+        updated_desc: (a, b) => toMillis(b.lastStatusAt || b.createdAt) - toMillis(a.lastStatusAt || a.createdAt),
+        updated_asc: (a, b) => toMillis(a.lastStatusAt || a.createdAt) - toMillis(b.lastStatusAt || b.createdAt),
+      };
+      filtered = filtered.slice().sort(sorters[sortValue] || sorters.created_desc);
+      renderOrders(filtered);
+      const keywordHint = keyword ? `，關鍵字「${keyword}」` : '';
+      const statusHint = statusValue ? `，狀態：${statusValue}` : '';
+      statusEl.className = 'ok';
+      statusEl.textContent = `已顯示 ${filtered.length} / ${allOrders.length} 筆${statusHint}${keywordHint}`;
+    }
+
     async function updateStatus(orderNumber) {
       const select = document.getElementById(`status-${orderNumber}`);
       const nextStatus = select ? select.value : '';
@@ -220,39 +317,8 @@
         });
         const json = await res.json();
         if (!res.ok || !json.success) throw new Error(json.message || '載入失敗');
-
-        const rows = (json.data || []).map(o => {
-          const details = Array.isArray(o.itemDetails) ? o.itemDetails : [];
-          const detailsHtml = details.length
-            ? details.map((it) => `${it.name || '-'} x${Number(it.quantity || 0)} @ NT$${Number(it.price || 0)}`).join('<br>')
-            : '-';
-          return `
-          <tr>
-            <td>${o.orderNumber || '-'}</td>
-            <td>${fmtDate(o.createdAt)}</td>
-            <td>${detailsHtml}</td>
-            <td>${o.customer?.name || '-'}</td>
-            <td>${o.customer?.address || '-'}</td>
-            <td>${o.customer?.phone || '-'}</td>
-            <td>NT$${o.total ?? 0}</td>
-            <td>${o.status || '-'}</td>
-            <td>${o.lastStatusBy || '-'}<br><span class="muted">${fmtDate(o.lastStatusAt)}</span></td>
-            <td>
-              <div class="row">
-                <button class="secondary" onclick="viewOrderDetail('${o.orderNumber}')">查看明細</button>
-                <select id="status-${o.orderNumber}">
-                  ${statusOptions(o.status)}
-                </select>
-                <button class="secondary" onclick="updateStatus('${o.orderNumber}')">更新</button>
-              </div>
-            </td>
-          </tr>
-        `;
-        }).join('');
-
-        ordersBody.innerHTML = rows || '<tr><td colspan="11" class="muted">目前沒有訂單</td></tr>';
-        statusEl.className = 'ok';
-        statusEl.textContent = `載入成功，共 ${json.count || 0} 筆（來源：${json.source || 'unknown'}）`;
+        allOrders = Array.isArray(json.data) ? json.data : [];
+        applyOrderFilters();
       } catch (err) {
         ordersBody.innerHTML = '<tr><td colspan="11" class="err">載入失敗，請確認後端已啟動</td></tr>';
         statusEl.className = 'err';
@@ -368,6 +434,9 @@
     document.getElementById('searchBtn').addEventListener('click', searchOrder);
     document.getElementById('saveApiBtn').addEventListener('click', saveApiBase);
     document.getElementById('testApiBtn').addEventListener('click', testApiConnection);
+    statusFilter.addEventListener('change', applyOrderFilters);
+    timeSort.addEventListener('change', applyOrderFilters);
+    keywordSearch.addEventListener('input', applyOrderFilters);
     window.updateStatus = updateStatus;
     window.viewOrderDetail = viewOrderDetail;
     (async () => {
