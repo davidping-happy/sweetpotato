@@ -34,6 +34,8 @@
     .timeline-item:last-child::after { display: none; }
     .timeline-title { font-weight: bold; color: #5d4037; }
     .timeline-meta { color: #777; font-size: 12px; margin-top: 2px; }
+    .order-link { color: #5d4037; text-decoration: underline; cursor: pointer; font-weight: 600; }
+    .detail-row td { background: #fffdf7; }
   </style>
 </head>
 <body>
@@ -85,20 +87,6 @@
         </tbody>
       </table>
     </div>
-
-    <div class="card">
-      <h3>查單筆訂單</h3>
-      <div class="row">
-        <input id="orderNumberInput" placeholder="輸入訂單編號，例如 PS-20260326-123" style="min-width:320px;" />
-        <button id="searchBtn" class="secondary">查詢</button>
-      </div>
-      <p id="searchStatus" class="muted"></p>
-      <div id="orderSummary" class="detail-box muted">尚未查詢</div>
-      <h4 style="margin: 12px 0 8px;">狀態變更時間軸</h4>
-      <ul id="orderTimeline" class="timeline">
-        <li class="muted">尚未查詢</li>
-      </ul>
-    </div>
   </div>
 
   <script src="./admin-auth.js"></script>
@@ -110,15 +98,13 @@
     const ordersBody = document.getElementById('ordersBody');
     const statusEl = document.getElementById('status');
     const logoutBtn = document.getElementById('logoutBtn');
-    const searchStatus = document.getElementById('searchStatus');
-    const orderSummary = document.getElementById('orderSummary');
-    const orderTimeline = document.getElementById('orderTimeline');
     const operatorInput = document.getElementById('operatorInput');
     const apiBaseInput = document.getElementById('apiBaseInput');
     const statusFilter = document.getElementById('statusFilter');
     const timeSort = document.getElementById('timeSort');
     const keywordSearch = document.getElementById('keywordSearch');
     let allOrders = [];
+    let expandedOrderNumber = null;
     const statusTransitions = {
       pending: ['pending', 'confirmed', 'cancelled'],
       confirmed: ['confirmed', 'shipped', 'cancelled'],
@@ -222,15 +208,93 @@
       ].join(' '));
     }
 
+    function renderOrderDetailRow(order) {
+      const items = Array.isArray(order.items)
+        ? order.items
+        : (Array.isArray(order.itemDetails) ? order.itemDetails : []);
+      const itemsRows = items.map((it) => {
+        const price = Number(it.price || 0);
+        const qty = Number(it.quantity || 0);
+        const lineTotal = price * qty;
+        return `
+          <tr>
+            <td>${it.name || '-'}</td>
+            <td>NT$${price}</td>
+            <td>${qty}</td>
+            <td>NT$${lineTotal}</td>
+          </tr>
+        `;
+      }).join('');
+
+      const history = Array.isArray(order.statusHistory) ? order.statusHistory : [];
+      const timelineHtml = history.length
+        ? history
+          .slice()
+          .sort((a, b) => new Date(a.changedAt) - new Date(b.changedAt))
+          .map(h => `
+            <li class="timeline-item">
+              <div class="timeline-title">${h.from} → ${h.to}</div>
+              <div class="timeline-meta">操作人：${h.changedBy || '-'} ｜ 時間：${fmtDate(h.changedAt)}</div>
+            </li>
+          `)
+          .join('')
+        : '<li class="muted">尚無狀態變更紀錄</li>';
+
+      return `
+        <tr class="detail-row">
+          <td colspan="10">
+            <div class="detail-box">
+              <div class="detail-grid">
+                <div><strong>訂單編號：</strong>${order.orderNumber || '-'}</div>
+                <div><strong>目前狀態：</strong>${order.status || '-'}</div>
+                <div><strong>建立時間：</strong>${fmtDate(order.createdAt)}</div>
+                <div><strong>總金額：</strong>NT$${order.total ?? 0}</div>
+                <div><strong>顧客：</strong>${order.customer?.name || '-'}</div>
+                <div><strong>電話：</strong>${order.customer?.phone || '-'}</div>
+                <div><strong>Email：</strong>${order.customer?.email || '-'}</div>
+                <div><strong>地址：</strong>${order.customer?.address || '-'}</div>
+                <div><strong>小計：</strong>NT$${order.subtotal ?? 0}</div>
+                <div><strong>運費：</strong>NT$${order.shipping ?? 0}</div>
+              </div>
+              <div><strong>商品明細</strong></div>
+              <table class="items-table">
+                <thead>
+                  <tr>
+                    <th>品名</th>
+                    <th>單價</th>
+                    <th>數量</th>
+                    <th>小計</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${itemsRows || '<tr><td colspan="4" class="muted">無商品資料</td></tr>'}
+                </tbody>
+              </table>
+              <div class="items-total">件數：${items.reduce((sum, it) => sum + Number(it.quantity || 0), 0)} 件</div>
+              <h4 style="margin: 12px 0 8px;">狀態變更時間軸</h4>
+              <ul class="timeline">
+                ${timelineHtml}
+              </ul>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+
     function renderOrders(orders) {
       const rows = orders.map(o => {
         const details = Array.isArray(o.itemDetails) ? o.itemDetails : [];
         const detailsHtml = details.length
           ? details.map((it) => `${it.name || '-'} x${Number(it.quantity || 0)} @ NT$${Number(it.price || 0)}`).join('<br>')
           : '-';
+        const isExpanded = expandedOrderNumber && expandedOrderNumber === o.orderNumber;
         return `
           <tr>
-            <td>${o.orderNumber || '-'}</td>
+            <td>
+              <span class="order-link" onclick="toggleOrderDetail('${o.orderNumber}')">
+                ${o.orderNumber || '-'}
+              </span>
+            </td>
             <td>${fmtDate(o.createdAt)}</td>
             <td>${detailsHtml}</td>
             <td>${o.customer?.name || '-'}</td>
@@ -241,7 +305,6 @@
             <td>${o.lastStatusBy || '-'}<br><span class="muted">${fmtDate(o.lastStatusAt)}</span></td>
             <td>
               <div class="row">
-                <button class="secondary" onclick="viewOrderDetail('${o.orderNumber}')">查看明細</button>
                 <select id="status-${o.orderNumber}">
                   ${statusOptions(o.status)}
                 </select>
@@ -249,6 +312,7 @@
               </div>
             </td>
           </tr>
+          ${isExpanded ? renderOrderDetailRow(o) : ''}
         `;
       }).join('');
       ordersBody.innerHTML = rows || '<tr><td colspan="11" class="muted">目前沒有符合條件的訂單</td></tr>';
@@ -326,98 +390,9 @@
       }
     }
 
-    async function searchOrder() {
-      const orderNumber = document.getElementById('orderNumberInput').value.trim();
-      if (!orderNumber) {
-        searchStatus.className = 'err';
-        searchStatus.textContent = '請先輸入訂單編號';
-        return;
-      }
-      searchStatus.className = 'muted';
-      searchStatus.textContent = '查詢中...';
-
-      try {
-        const res = await fetch(apiUrl(`/api/orders/${encodeURIComponent(orderNumber)}`), {
-          headers: await getAuthHeaders(),
-        });
-        const json = await res.json();
-        if (!res.ok || !json.success) throw new Error(json.message || '查詢失敗');
-
-        const d = json.data || {};
-        const items = Array.isArray(d.items) ? d.items : [];
-        const itemsRows = items.map((it) => {
-          const price = Number(it.price || 0);
-          const qty = Number(it.quantity || 0);
-          const lineTotal = price * qty;
-          return `
-            <tr>
-              <td>${it.name || '-'}</td>
-              <td>NT$${price}</td>
-              <td>${qty}</td>
-              <td>NT$${lineTotal}</td>
-            </tr>
-          `;
-        }).join('');
-        orderSummary.className = 'detail-box';
-        orderSummary.innerHTML = `
-          <div class="detail-grid">
-            <div><strong>訂單編號：</strong>${d.orderNumber || '-'}</div>
-            <div><strong>目前狀態：</strong>${d.status || '-'}</div>
-            <div><strong>建立時間：</strong>${fmtDate(d.createdAt)}</div>
-            <div><strong>總金額：</strong>NT$${d.total ?? 0}</div>
-            <div><strong>顧客：</strong>${d.customer?.name || '-'}</div>
-            <div><strong>電話：</strong>${d.customer?.phone || '-'}</div>
-            <div><strong>Email：</strong>${d.customer?.email || '-'}</div>
-            <div><strong>地址：</strong>${d.customer?.address || '-'}</div>
-            <div><strong>小計：</strong>NT$${d.subtotal ?? 0}</div>
-            <div><strong>運費：</strong>NT$${d.shipping ?? 0}</div>
-          </div>
-          <div><strong>商品明細</strong></div>
-          <table class="items-table">
-            <thead>
-              <tr>
-                <th>品名</th>
-                <th>單價</th>
-                <th>數量</th>
-                <th>小計</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${itemsRows || '<tr><td colspan="4" class="muted">無商品資料</td></tr>'}
-            </tbody>
-          </table>
-          <div class="items-total">件數：${items.reduce((sum, it) => sum + Number(it.quantity || 0), 0)} 件</div>
-        `;
-
-        const history = Array.isArray(d.statusHistory) ? d.statusHistory : [];
-        orderTimeline.innerHTML = history.length
-          ? history
-            .slice()
-            .sort((a, b) => new Date(a.changedAt) - new Date(b.changedAt))
-            .map(h => `
-              <li class="timeline-item">
-                <div class="timeline-title">${h.from} → ${h.to}</div>
-                <div class="timeline-meta">操作人：${h.changedBy || '-'} ｜ 時間：${fmtDate(h.changedAt)}</div>
-              </li>
-            `)
-            .join('')
-          : '<li class="muted">尚無狀態變更紀錄</li>';
-        searchStatus.className = 'ok';
-        searchStatus.textContent = `查詢成功（來源：${json.source || 'unknown'}）`;
-      } catch (err) {
-        orderSummary.className = 'detail-box err';
-        orderSummary.textContent = '查無資料';
-        orderTimeline.innerHTML = '<li class="muted">查無資料</li>';
-        searchStatus.className = 'err';
-        searchStatus.textContent = `查詢失敗：${err.message}`;
-      }
-    }
-
-    async function viewOrderDetail(orderNumber) {
-      const input = document.getElementById('orderNumberInput');
-      input.value = orderNumber || '';
-      await searchOrder();
-      document.querySelector('.card h3')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    function toggleOrderDetail(orderNumber) {
+      expandedOrderNumber = expandedOrderNumber === orderNumber ? null : orderNumber;
+      applyOrderFilters();
     }
 
     async function logout() {
@@ -431,14 +406,13 @@
 
     document.getElementById('reloadBtn').addEventListener('click', loadOrders);
     logoutBtn.addEventListener('click', logout);
-    document.getElementById('searchBtn').addEventListener('click', searchOrder);
     document.getElementById('saveApiBtn').addEventListener('click', saveApiBase);
     document.getElementById('testApiBtn').addEventListener('click', testApiConnection);
     statusFilter.addEventListener('change', applyOrderFilters);
     timeSort.addEventListener('change', applyOrderFilters);
     keywordSearch.addEventListener('input', applyOrderFilters);
     window.updateStatus = updateStatus;
-    window.viewOrderDetail = viewOrderDetail;
+    window.toggleOrderDetail = toggleOrderDetail;
     (async () => {
       const auth = await window.AdminAuth.requireAdminSession({ loginPath: './admin-login.html' });
       if (!auth?.token) return;
