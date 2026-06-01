@@ -11,12 +11,22 @@ function isLineLoginConfigured() {
   return Boolean(channelId && channelSecret);
 }
 
+function getApiBaseFromEnv() {
+  return String(process.env.PUBLIC_API_BASE_URL || process.env.ADMIN_APP_URL || '')
+    .trim()
+    .replace(/\/+$/, '');
+}
+
 function getLineLoginCallbackUrl(req) {
   const configured = String(process.env.LINE_LOGIN_CALLBACK_URL || '').trim();
   if (configured) return configured.replace(/\/+$/, '');
   const proto = String(req.headers['x-forwarded-proto'] || req.protocol || 'https').split(',')[0].trim();
-  const hostname = String(req.headers['x-forwarded-host'] || req.get('host') || 'sweetpotato-api.onrender.com').trim();
-  return `${proto}://${hostname}/api/line/login/callback`;
+  const hostname = String(req.headers['x-forwarded-host'] || req.get('host') || '').trim();
+  if (hostname) {
+    return `${proto}://${hostname}/api/line/login/callback`.replace(/\/+$/, '');
+  }
+  const apiBase = getApiBaseFromEnv();
+  return apiBase ? `${apiBase}/api/line/login/callback` : '';
 }
 
 function getDefaultStorefrontUrl() {
@@ -44,7 +54,8 @@ function isAllowedReturnUrl(rawUrl) {
 function getStaticCallbackUrl() {
   const configured = String(process.env.LINE_LOGIN_CALLBACK_URL || '').trim();
   if (configured) return configured.replace(/\/+$/, '');
-  return 'https://sweetpotato-api.onrender.com/api/line/login/callback';
+  const apiBase = getApiBaseFromEnv();
+  return apiBase ? `${apiBase}/api/line/login/callback` : '';
 }
 
 function getPublicLineConfig() {

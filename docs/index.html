@@ -420,21 +420,12 @@
     </div>
 
     <!-- Scripts for UI Interactivity -->
+    <script src="./app-runtime.js"></script>
     <script>
         // Initialize Lucide icons
         lucide.createIcons();
 
         // ============ Config ============
-        const API_BASE_STORAGE_KEY = 'sweetpotato_storefront_api_base';
-        const DEFAULT_CLOUD_API = 'https://sweetpotato-api.onrender.com';
-        const API_BASE = (() => {
-            const saved = (localStorage.getItem(API_BASE_STORAGE_KEY) || '').trim().replace(/\/+$/, '');
-            if (saved) return saved;
-            if (window.location.origin.includes('localhost') || window.location.protocol === 'file:') {
-                return 'http://localhost:3000';
-            }
-            return DEFAULT_CLOUD_API;
-        })();
         const productIdByName = {};
         const LINE_USER_ID_KEY = 'sweetpotato_line_user_id';
         let publicConfig = {
@@ -444,6 +435,10 @@
             lineLoginCallbackUrl: '',
             lineCustomerNotifyEnabled: false,
         };
+
+        function apiUrl(path) {
+            return window.AppRuntime.apiUrl(path);
+        }
 
         function applySavedLineUserId() {
             const saved = (localStorage.getItem(LINE_USER_ID_KEY) || '').trim();
@@ -547,9 +542,11 @@
                 return msg;
             }
             if (msg.includes('無法正常執行') || msg.includes('LINE Login 設定') || msg.includes('invalid_client')) {
-                const cb = publicConfig.lineLoginCallbackUrl || 'https://sweetpotato-api.onrender.com/api/line/login/callback';
+                const cb = publicConfig.lineLoginCallbackUrl || '';
                 const hint = publicConfig.lineLoginChannelHint ? `（頻道尾碼 ${publicConfig.lineLoginChannelHint}）` : '';
-                return `LINE 登入失敗${hint}：請在 LINE Login 頻道設定 Callback URL 為 ${cb}，並按 Publish`;
+                return cb
+                    ? `LINE 登入失敗${hint}：請在 LINE Login 頻道設定 Callback URL 為 ${cb}，並按 Publish`
+                    : `LINE 登入失敗${hint}：請確認後台 LINE Login 設定`;
             }
             return msg || 'LINE 綁定失敗，請稍後再試';
         }
@@ -589,34 +586,37 @@
             }
         }
 
+        function applyPublicConfigFromRuntime() {
+            const json = window.AppRuntime.getPublicConfig();
+            publicConfig = {
+                lineLoginEnabled: Boolean(json.lineLoginEnabled),
+                lineLoginConfigError: String(json.lineLoginConfigError || '').trim(),
+                lineLoginChannelHint: String(json.lineLoginChannelHint || '').trim(),
+                lineLoginCallbackUrl: String(json.lineLoginCallbackUrl || '').trim(),
+                lineCustomerNotifyEnabled: Boolean(json.lineCustomerNotifyEnabled),
+            };
+
+            applyLineBindFromUrl();
+            syncLineBindLinks();
+            showLineBindButtons();
+
+            if (!publicConfig.lineLoginEnabled) {
+                const hint = publicConfig.lineLoginConfigError || '店家尚未完成 LINE Login 設定';
+                showLineBindUnavailable(`${hint}。目前請改選「Email 確認信」。`);
+                return;
+            }
+
+            if (!document.getElementById('cust-line-user-id').value && applySavedLineUserId()) {
+                return;
+            }
+            if (!document.getElementById('cust-line-user-id').value) {
+                updateLineBindUi(false);
+            }
+        }
+
         async function loadPublicConfig() {
             try {
-                const res = await fetch(`${API_BASE}/api/config`);
-                const json = await res.json().catch(() => ({}));
-                publicConfig = {
-                    lineLoginEnabled: Boolean(json.lineLoginEnabled),
-                    lineLoginConfigError: String(json.lineLoginConfigError || '').trim(),
-                    lineLoginChannelHint: String(json.lineLoginChannelHint || '').trim(),
-                    lineLoginCallbackUrl: String(json.lineLoginCallbackUrl || '').trim(),
-                    lineCustomerNotifyEnabled: Boolean(json.lineCustomerNotifyEnabled),
-                };
-
-                applyLineBindFromUrl();
-                syncLineBindLinks();
-                showLineBindButtons();
-
-                if (!publicConfig.lineLoginEnabled) {
-                    const hint = publicConfig.lineLoginConfigError || '店家尚未完成 LINE Login 設定';
-                    showLineBindUnavailable(`${hint}。目前請改選「Email 確認信」。`);
-                    return;
-                }
-
-                if (!document.getElementById('cust-line-user-id').value && applySavedLineUserId()) {
-                    return;
-                }
-                if (!document.getElementById('cust-line-user-id').value) {
-                    updateLineBindUi(false);
-                }
+                applyPublicConfigFromRuntime();
             } catch (_) {
                 showLineBindUnavailable('無法載入 LINE 設定，請改選 Email 確認信。');
                 syncLineBindLinks();
@@ -632,7 +632,7 @@
         function buildLineLoginHref(openCart) {
             const returnUrl = encodeURIComponent(getStorefrontReturnUrl());
             const openCartParam = openCart ? '&openCart=1' : '';
-            return `${API_BASE}/api/line/login/start?returnUrl=${returnUrl}${openCartParam}`;
+            return `${apiUrl('/api/line/login/start')}?returnUrl=${returnUrl}${openCartParam}`;
         }
 
         function syncLineBindLinks() {
@@ -804,7 +804,7 @@
 
         async function loadProducts() {
             try {
-                const res = await fetch(`${API_BASE}/api/products`);
+                const res = await fetch(apiUrl('/api/products'));
                 const json = await res.json();
                 if (!json.success) return;
 
@@ -1074,7 +1074,7 @@
 
             await ensureCartProductIds();
             try {
-                const res = await fetch(`${API_BASE}/api/orders`, {
+                const res = await fetch(apiUrl('/api/orders'), {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1129,13 +1129,20 @@
         document.addEventListener('click', handleLineBindClick);
 
         // ============ Init ============
-        showLineBindButtons();
-        setCompactLineBindLabel('nav-line-bind-btn', 'nav-line-bind-label', 'LINE');
-        setCompactLineBindLabel('cart-line-bind-btn', 'cart-line-bind-label', 'LINE');
-        setFullLineBindLabel('cart-footer-line-bind-label', '綁定 LINE 通知');
-        updateCartUI();
-        loadProducts();
-        loadPublicConfig();
+        window.AppRuntime.init()
+            .then(() => {
+                showLineBindButtons();
+                setCompactLineBindLabel('nav-line-bind-btn', 'nav-line-bind-label', 'LINE');
+                setCompactLineBindLabel('cart-line-bind-btn', 'cart-line-bind-label', 'LINE');
+                setFullLineBindLabel('cart-footer-line-bind-label', '綁定 LINE 通知');
+                updateCartUI();
+                loadProducts();
+                loadPublicConfig();
+            })
+            .catch((err) => {
+                showLineBindUnavailable(`無法載入 API 設定：${err.message}`);
+                updateCartUI();
+            });
     </script>
 </body>
 </html>

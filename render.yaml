@@ -3,7 +3,7 @@ services:
     name: sweetpotato-api
     runtime: node
     rootDir: server
-    buildCommand: npm ci
+    buildCommand: npm ci && node ../scripts/generate-app-config.js
     startCommand: npm start
     healthCheckPath: /api/health
     envVars:
@@ -16,6 +16,8 @@ services:
       - key: ADMIN_JWT_SECRET
         sync: false
       - key: ADMIN_APP_URL
+        value: https://sweetpotato-api.onrender.com
+      - key: PUBLIC_API_BASE_URL
         value: https://sweetpotato-api.onrender.com
       - key: SMTP_HOST
         sync: false

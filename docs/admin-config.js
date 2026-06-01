@@ -1,3 +1,2 @@
-// Deprecated: admin login has switched to backend JWT auth.
-// This file is kept for compatibility and is no longer used.
+// Deprecated: frontend API base URL is loaded from app-config.json / AppRuntime.
 window.SWEETPOTATO_ADMIN_CONFIG = {};

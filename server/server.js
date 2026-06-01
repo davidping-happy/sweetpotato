@@ -56,15 +56,20 @@ async function saveFallbackOrdersToFile(orders) {
 app.use(cors());
 app.use(express.json());
 
+const { getPublicAppConfig } = require('./utils/publicAppConfig');
+
+// ============ 公開設定（由環境變數提供，不含密鑰） ============
+app.get('/api/config', (req, res) => {
+  res.json(getPublicAppConfig(req));
+});
+
+app.get('/app-config.json', (req, res) => {
+  const config = getPublicAppConfig(req);
+  res.json({ apiBaseUrl: config.apiBaseUrl || '' });
+});
+
 // 靜態檔案：統一使用 docs 作為唯一前台來源
 app.use(express.static(path.join(__dirname, '..', 'docs')));
-
-// ============ 公開設定（不含密鑰） ============
-const { getPublicLineConfig } = require('./utils/lineLoginConfig');
-
-app.get('/api/config', (req, res) => {
-  res.json(getPublicLineConfig());
-});
 
 // ============ API 路由 ============
 app.use('/api/products', productsRouter);

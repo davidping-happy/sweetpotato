@@ -47,8 +47,6 @@
         <button id="reloadBtn">重新載入訂單</button>
         <button id="logoutBtn" class="secondary">登出</button>
         <input id="operatorInput" value="admin" placeholder="操作人（例如店長）" />
-        <input id="apiBaseInput" placeholder="API URL（例如 https://your-api.com）" style="min-width:320px;" />
-        <button id="saveApiBtn" class="secondary">儲存 API URL</button>
         <button id="testApiBtn" class="secondary">測試連線</button>
         <span id="status" class="muted">尚未載入</span>
       </div>
@@ -89,17 +87,13 @@
     </div>
   </div>
 
+  <script src="./app-runtime.js"></script>
   <script src="./admin-auth.js"></script>
   <script>
-    const API_BASE_STORAGE_KEY = 'sweetpotato_admin_api_base';
-    const DEFAULT_API_BASE = window.location.origin.includes('localhost')
-      ? 'http://localhost:3000'
-      : 'https://sweetpotato-api.onrender.com';
     const ordersBody = document.getElementById('ordersBody');
     const statusEl = document.getElementById('status');
     const logoutBtn = document.getElementById('logoutBtn');
     const operatorInput = document.getElementById('operatorInput');
-    const apiBaseInput = document.getElementById('apiBaseInput');
     const statusFilter = document.getElementById('statusFilter');
     const timeSort = document.getElementById('timeSort');
     const keywordSearch = document.getElementById('keywordSearch');
@@ -127,21 +121,8 @@
       return d.toLocaleString('zh-TW');
     }
 
-    function normalizeApiBase(raw) {
-      const val = String(raw || '').trim().replace(/\/+$/, '');
-      if (!val) return '';
-      return val;
-    }
-
-    function getApiBase() {
-      const saved = localStorage.getItem(API_BASE_STORAGE_KEY);
-      return normalizeApiBase(saved || DEFAULT_API_BASE);
-    }
-
     function apiUrl(path) {
-      const base = getApiBase();
-      const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-      return `${base}${normalizedPath}`;
+      return window.AppRuntime.apiUrl(path);
     }
 
     async function getAuthHeaders() {
@@ -153,23 +134,11 @@
       return authHeaders;
     }
 
-    function initApiBaseInput() {
-      apiBaseInput.value = getApiBase();
-    }
-
-    function saveApiBase() {
-      const normalized = normalizeApiBase(apiBaseInput.value);
-      localStorage.setItem(API_BASE_STORAGE_KEY, normalized);
-      apiBaseInput.value = normalized;
-      statusEl.className = 'ok';
-      statusEl.textContent = `已儲存 API URL：${normalized || '(空白)'}`;
-    }
-
     async function testApiConnection() {
-      const base = getApiBase();
+      const base = window.AppRuntime.getApiBase();
       if (!base) {
         statusEl.className = 'err';
-        statusEl.textContent = '請先輸入並儲存 API URL';
+        statusEl.textContent = 'API 設定尚未載入';
         return;
       }
       statusEl.className = 'muted';
@@ -426,7 +395,6 @@
 
     document.getElementById('reloadBtn').addEventListener('click', loadOrders);
     logoutBtn.addEventListener('click', logout);
-    document.getElementById('saveApiBtn').addEventListener('click', saveApiBase);
     document.getElementById('testApiBtn').addEventListener('click', testApiConnection);
     statusFilter.addEventListener('change', applyOrderFilters);
     timeSort.addEventListener('change', applyOrderFilters);
@@ -434,9 +402,15 @@
     window.updateStatus = updateStatus;
     window.toggleOrderDetail = toggleOrderDetail;
     (async () => {
+      try {
+        await window.AppRuntime.init();
+      } catch (err) {
+        statusEl.className = 'err';
+        statusEl.textContent = `API 設定載入失敗：${err.message}`;
+        return;
+      }
       const auth = await window.AdminAuth.requireAdminSession({ loginPath: './admin-login.html' });
       if (!auth?.token) return;
-      initApiBaseInput();
       loadOrders();
     })();
   </script>

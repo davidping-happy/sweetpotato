@@ -1,28 +1,19 @@
 (() => {
   const ADMIN_TOKEN_KEY = 'sweetpotato_admin_token';
-  const API_BASE_STORAGE_KEY = 'sweetpotato_admin_api_base';
-  const DEFAULT_API_BASE = window.location.origin.includes('localhost')
-    ? 'http://localhost:3000'
-    : 'https://sweetpotato-api.onrender.com';
 
   function normalizeValue(value) {
     return String(value || '').trim();
   }
 
-  function normalizeApiBase(raw) {
-    const val = normalizeValue(raw).replace(/\/+$/, '');
-    return val || '';
-  }
-
-  function getApiBase() {
-    const saved = localStorage.getItem(API_BASE_STORAGE_KEY);
-    return normalizeApiBase(saved || DEFAULT_API_BASE);
+  async function ensureRuntimeReady() {
+    if (!window.AppRuntime) {
+      throw new Error('AppRuntime 未載入');
+    }
+    await window.AppRuntime.init();
   }
 
   function apiUrl(path) {
-    const base = getApiBase();
-    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-    return `${base}${normalizedPath}`;
+    return window.AppRuntime.apiUrl(path);
   }
 
   function getToken() {
@@ -34,6 +25,7 @@
   }
 
   async function requireAdminSession(options = {}) {
+    await ensureRuntimeReady();
     const loginPath = options.loginPath || './admin-login.html';
     const redirectOnFail = options.redirectOnFail !== false;
     const token = getToken();
@@ -61,6 +53,7 @@
   }
 
   async function signInWithPassword(email, password) {
+    await ensureRuntimeReady();
     const res = await fetch(apiUrl('/api/admin/login'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -81,6 +74,7 @@
   }
 
   async function requestPasswordReset(email) {
+    await ensureRuntimeReady();
     const res = await fetch(apiUrl('/api/admin/forgot-password'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -94,6 +88,7 @@
   }
 
   async function resetPasswordWithToken(token, password) {
+    await ensureRuntimeReady();
     const res = await fetch(apiUrl('/api/admin/reset-password'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -130,7 +125,6 @@
   }
 
   window.AdminAuth = {
-    getApiBase,
     apiUrl,
     getToken,
     setToken,
