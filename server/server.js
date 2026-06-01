@@ -11,11 +11,13 @@ const productsRouter = require('./routes/products');
 const ordersRouter = require('./routes/orders');
 const adminAuthRouter = require('./routes/adminAuth');
 const lineAuthRouter = require('./routes/lineAuth');
+const newsletterRouter = require('./routes/newsletter');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const FALLBACK_DATA_DIR = path.join(__dirname, 'data');
 const FALLBACK_ORDERS_FILE = path.join(FALLBACK_DATA_DIR, 'orders.json');
+const FALLBACK_NEWSLETTER_FILE = path.join(FALLBACK_DATA_DIR, 'newsletter-subscribers.json');
 
 // ====== DB fallback (no Mongo / no mongodb-memory-server) ======
 const fallbackProducts = seedProducts.map((p, idx) => ({
@@ -28,13 +30,36 @@ app.locals.db = {
   ready: false,
   fallbackProducts,
   fallbackOrders: [],
+  fallbackNewsletterSubscribers: [],
   saveFallbackOrders: async () => {},
+  saveFallbackNewsletterSubscribers: async () => {},
 };
 
 async function loadFallbackOrdersFromFile() {
   try {
     await fs.mkdir(FALLBACK_DATA_DIR, { recursive: true });
     const raw = await fs.readFile(FALLBACK_ORDERS_FILE, 'utf8');
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed;
+  } catch {
+    return [];
+  }
+}
+
+async function saveFallbackNewsletterSubscribersToFile(subscribers) {
+  try {
+    await fs.mkdir(FALLBACK_DATA_DIR, { recursive: true });
+    await fs.writeFile(FALLBACK_NEWSLETTER_FILE, JSON.stringify(subscribers, null, 2), 'utf8');
+  } catch (err) {
+    console.error('⚠️  寫入 fallback 電子報名單失敗:', err.message);
+  }
+}
+
+async function loadFallbackNewsletterSubscribersFromFile() {
+  try {
+    await fs.mkdir(FALLBACK_DATA_DIR, { recursive: true });
+    const raw = await fs.readFile(FALLBACK_NEWSLETTER_FILE, 'utf8');
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
     return parsed;
@@ -76,6 +101,7 @@ app.use('/api/products', productsRouter);
 app.use('/api/admin', adminAuthRouter);
 app.use('/api/line', lineAuthRouter);
 app.use('/api/orders', ordersRouter);
+app.use('/api/newsletter', newsletterRouter);
 
 // ============ 健康檢查 ============
 app.get('/api/health', (req, res) => {
@@ -113,10 +139,15 @@ async function startServer() {
     // memory fallback 模式：啟動時先載入已保存訂單，並提供保存函式
     if (!dbReady) {
       app.locals.db.fallbackOrders = await loadFallbackOrdersFromFile();
+      app.locals.db.fallbackNewsletterSubscribers = await loadFallbackNewsletterSubscribersFromFile();
       app.locals.db.saveFallbackOrders = async () => {
         await saveFallbackOrdersToFile(app.locals.db.fallbackOrders || []);
       };
+      app.locals.db.saveFallbackNewsletterSubscribers = async () => {
+        await saveFallbackNewsletterSubscribersToFile(app.locals.db.fallbackNewsletterSubscribers || []);
+      };
       console.log(`🗂️  fallback 訂單已載入 ${app.locals.db.fallbackOrders.length} 筆`);
+      console.log(`📰 fallback 電子報訂閱已載入 ${app.locals.db.fallbackNewsletterSubscribers.length} 筆`);
     }
 
     if (dbReady) {
