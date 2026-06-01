@@ -112,6 +112,13 @@
       completed: ['completed'],
       cancelled: ['cancelled'],
     };
+    const statusLabelMap = {
+      pending: '待處理',
+      confirmed: '處理中',
+      shipped: '已出貨',
+      completed: '已完成',
+      cancelled: '已取消',
+    };
 
     function fmtDate(iso) {
       if (!iso) return '-';
@@ -183,7 +190,14 @@
 
     function statusOptions(current) {
       const allowed = statusTransitions[current] || [current];
-      return allowed.map(s => `<option value="${s}" ${s === current ? 'selected' : ''}>${s}</option>`).join('');
+      return allowed.map((s) => {
+        const label = statusLabelMap[s] || s;
+        return `<option value="${s}" ${s === current ? 'selected' : ''}>${label}</option>`;
+      }).join('');
+    }
+
+    function isTerminalStatus(status) {
+      return status === 'completed' || status === 'cancelled';
     }
 
     function toMillis(value) {
@@ -308,7 +322,7 @@
                 <select id="status-${o.orderNumber}">
                   ${statusOptions(o.status)}
                 </select>
-                <button class="secondary" onclick="updateStatus('${o.orderNumber}')">更新</button>
+                <button class="secondary" onclick="updateStatus('${o.orderNumber}')" ${isTerminalStatus(o.status) ? 'disabled title="此狀態不可再變更"' : ''}>更新</button>
               </div>
             </td>
           </tr>
@@ -343,6 +357,12 @@
     }
 
     async function updateStatus(orderNumber) {
+      const order = allOrders.find((o) => o.orderNumber === orderNumber);
+      if (order && isTerminalStatus(order.status)) {
+        statusEl.className = 'err';
+        statusEl.textContent = `訂單 ${orderNumber} 目前為「${statusLabelMap[order.status] || order.status}」，不可再變更`;
+        return;
+      }
       const select = document.getElementById(`status-${orderNumber}`);
       const nextStatus = select ? select.value : '';
       if (!nextStatus) return;

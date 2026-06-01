@@ -113,6 +113,24 @@ const STATUS_TRANSITIONS = {
   cancelled: [],
 };
 
+function getAllowedNextStatuses(currentStatus) {
+  return STATUS_TRANSITIONS[currentStatus] || [];
+}
+
+function validateStatusTransition(currentStatus, nextStatus) {
+  if (currentStatus === nextStatus) {
+    return { ok: true, unchanged: true };
+  }
+  const allowedNext = getAllowedNextStatuses(currentStatus);
+  if (!allowedNext.includes(nextStatus)) {
+    return {
+      ok: false,
+      message: `不允許狀態變更：${currentStatus} -> ${nextStatus}。可更新為：${allowedNext.join(', ') || '無'}`,
+    };
+  }
+  return { ok: true, unchanged: false };
+}
+
 // ============ GET /api/orders ============
 // 簡易後台查詢：支援 MongoDB 與 in-memory fallback 兩種模式
 router.get('/', requireAdminAuth, async (req, res) => {
@@ -199,7 +217,8 @@ router.patch('/:orderNumber/status', requireAdminAuth, async (req, res) => {
         return res.status(404).json({ success: false, message: '查無此訂單' });
       }
       const currentStatus = existing.status;
-      if (currentStatus === status) {
+      const transition = validateStatusTransition(currentStatus, status);
+      if (transition.unchanged) {
         return res.json({
           success: true,
           source: 'mongodb',
@@ -207,12 +226,10 @@ router.patch('/:orderNumber/status', requireAdminAuth, async (req, res) => {
           data: formatOrderDetail(existing),
         });
       }
-
-      const allowedNext = STATUS_TRANSITIONS[currentStatus] || [];
-      if (!allowedNext.includes(status)) {
+      if (!transition.ok) {
         return res.status(400).json({
           success: false,
-          message: `不允許狀態回退：${currentStatus} -> ${status}。可更新為：${allowedNext.join(', ') || '無'}`,
+          message: transition.message,
         });
       }
 
@@ -241,7 +258,8 @@ router.patch('/:orderNumber/status', requireAdminAuth, async (req, res) => {
       return res.status(404).json({ success: false, message: '查無此訂單' });
     }
     const currentStatus = target.status;
-    if (currentStatus === status) {
+    const transition = validateStatusTransition(currentStatus, status);
+    if (transition.unchanged) {
       return res.json({
         success: true,
         source: 'memory',
@@ -249,11 +267,10 @@ router.patch('/:orderNumber/status', requireAdminAuth, async (req, res) => {
         data: formatOrderDetail(target),
       });
     }
-    const allowedNext = STATUS_TRANSITIONS[currentStatus] || [];
-    if (!allowedNext.includes(status)) {
+    if (!transition.ok) {
       return res.status(400).json({
         success: false,
-        message: `不允許狀態回退：${currentStatus} -> ${status}。可更新為：${allowedNext.join(', ') || '無'}`,
+        message: transition.message,
       });
     }
     target.status = status;
