@@ -92,6 +92,8 @@ app.get('/api/health', (req, res) => {
     status: 'ok',
     service: '磐石烤地瓜 API',
     timestamp: new Date().toISOString(),
+    database: req.app.locals.db?.ready ? 'mongodb' : 'fallback',
+    mongodbConnected: Boolean(req.app.locals.db?.ready),
   });
 });
 
