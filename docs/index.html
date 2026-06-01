@@ -1074,19 +1074,39 @@
 
         function formatNotificationStatus(type, result) {
             if (!result) return `${type}：狀態未知`;
-            if (result.sent) return `${type}：已送出`;
+            if (result.sent) {
+                const to = String(result.recipient || '').trim();
+                return to ? `${type}：已寄出至 ${to}` : `${type}：已寄出`;
+            }
 
             const reason = String(result.reason || '');
             if (reason === 'disabled_by_customer') return `${type}：未啟用`;
-            if (reason === 'missing_customer_email') return 'Email：未填寫信箱，無法寄送';
-            if (reason === 'smtp_not_configured') return 'Email：伺服器未設定 SMTP';
+            if (reason === 'missing_customer_email') return `${type}：未填寫信箱，無法寄送`;
+            if (reason === 'smtp_not_configured') return `${type}：伺服器未設定 SMTP（請在 Render 設定 SMTP_*）`;
+            if (reason === 'smtp_auth_failed') return `${type}：SMTP 帳密錯誤（請檢查 Gmail 應用程式密碼）`;
+            if (reason === 'smtp_connection_failed') return `${type}：無法連線 SMTP 伺服器`;
             if (reason === 'missing_customer_line_user_id') return '您的 LINE：尚未綁定，無法推播';
             if (reason === 'missing_line_channel_token') return '您的 LINE：伺服器未設定 LINE_CHANNEL_ACCESS_TOKEN';
             if (reason === 'missing_line_shop_config') return '店家 LINE：未設定（需 LINE_CHANNEL_ACCESS_TOKEN + LINE_SHOP_USER_ID）';
             if (reason === 'webhook_accepted_unverified') return '店家 LINE：Webhook 已接收但未確認送達（建議改用 Messaging API）';
             if (reason.startsWith('line_api_')) return `${type}：LINE API 失敗（${reason.replace('line_api_', 'HTTP ')})`;
             if (reason.startsWith('http_')) return `${type}：Webhook 失敗（${reason.replace('http_', 'HTTP ')})`;
-            return `${type}：失敗（${reason || '未知原因'}）`;
+            return `${type}：未寄出（${reason || '未知原因'}）`;
+        }
+
+        function formatEmailNotificationSummary(emailNotifications) {
+            if (!emailNotifications) return 'Email：狀態未知';
+
+            // 舊版 API：單一 email 結果
+            if (emailNotifications.customer === undefined && emailNotifications.shop === undefined) {
+                return formatNotificationStatus('Email', emailNotifications);
+            }
+
+            const parts = [
+                formatNotificationStatus('Email（客戶）', emailNotifications.customer),
+                formatNotificationStatus('Email（店家）', emailNotifications.shop),
+            ];
+            return parts.join('\n');
         }
 
         function formatLineNotificationSummary(line, notifyPreference) {
@@ -1161,7 +1181,7 @@
                 const json = await res.json().catch(() => ({}));
                 if (res.ok && json.success) {
                     const d = json.data || {};
-                    const emailStatus = formatNotificationStatus('Email', d.notifications?.email);
+                    const emailStatus = formatEmailNotificationSummary(d.notifications?.email);
                     const lineStatus = formatLineNotificationSummary(d.notifications?.line, fields.notifyPreference);
                     const notifyLines = [emailStatus, lineStatus].filter(Boolean).join('\n');
                     alert(`訂單建立成功！\n訂單編號：${d.orderNumber || json.orderId || '-'}\n${notifyLines}`);

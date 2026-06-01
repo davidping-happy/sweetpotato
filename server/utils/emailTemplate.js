@@ -140,4 +140,37 @@ function buildOrderEmailHTML(order) {
 </html>`;
 }
 
-module.exports = { buildOrderEmailHTML };
+/**
+ * 店家新訂單通知郵件 HTML
+ */
+function buildOrderShopEmailHTML(order) {
+  const itemsList = order.items
+    .map((item) => `<li>${item.name} × ${item.quantity}（NT$${item.price * item.quantity}）</li>`)
+    .join('');
+
+  const shippingLabel = order.shipping === 0 ? '免運費' : `NT$${order.shipping}`;
+
+  return `
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head><meta charset="utf-8" /></head>
+<body style="margin:0; padding:24px; background:#FFF9E6; font-family:Arial,'PingFang TC','Microsoft JhengHei',sans-serif; color:#5D4037;">
+  <div style="max-width:560px; margin:0 auto; background:#fff; border-radius:12px; padding:28px; box-shadow:0 4px 16px rgba(0,0,0,0.06);">
+    <h2 style="margin:0 0 8px; color:#F28C28;">🍠 新訂單通知</h2>
+    <p style="margin:0 0 20px; font-size:14px;">訂單編號：<strong style="color:#F28C28;">${order.orderNumber}</strong></p>
+    <table style="width:100%; font-size:14px; line-height:1.8; margin-bottom:20px;">
+      <tr><td style="width:88px; color:#888;">姓名</td><td>${order.customer?.name || '-'}</td></tr>
+      <tr><td style="color:#888;">電話</td><td>${order.customer?.phone || '-'}</td></tr>
+      <tr><td style="color:#888;">Email</td><td>${order.customer?.email || '未填寫'}</td></tr>
+      <tr><td style="color:#888;">地址</td><td>${order.customer?.address || '-'}</td></tr>
+    </table>
+    <p style="margin:0 0 8px; font-weight:bold;">商品明細</p>
+    <ul style="margin:0 0 20px; padding-left:20px; font-size:14px;">${itemsList}</ul>
+    <p style="margin:0; font-size:14px;">小計 NT$${order.subtotal}｜運費 ${shippingLabel}｜<strong style="color:#F28C28; font-size:18px;">總計 NT$${order.total}</strong></p>
+    <p style="margin:24px 0 0; font-size:12px; color:#999;">請至後台確認並處理訂單。</p>
+  </div>
+</body>
+</html>`;
+}
+
+module.exports = { buildOrderEmailHTML, buildOrderShopEmailHTML };

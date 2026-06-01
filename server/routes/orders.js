@@ -1,7 +1,7 @@
 const express = require('express');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
-const { sendOrderConfirmation } = require('../utils/mailer');
+const { sendOrderConfirmation, sendOrderShopNotification } = require('../utils/mailer');
 const { sendLineOrderNotifications } = require('../utils/lineNotifier');
 const { requireAdminAuth } = require('../middleware/requireAdminAuth');
 
@@ -496,7 +496,10 @@ router.post('/', async (req, res) => {
 
     // --- 通知（Email / LINE） ---
     const notifications = {
-      email: { attempted: false, sent: false, reason: 'disabled_by_customer' },
+      email: {
+        customer: { attempted: false, sent: false, reason: 'disabled_by_customer' },
+        shop: { attempted: false, sent: false, reason: 'pending' },
+      },
       line: {
         shop: { attempted: false, sent: false, reason: 'disabled_by_customer' },
         customer: { attempted: false, sent: false, reason: 'disabled_by_customer' },
@@ -507,11 +510,17 @@ router.post('/', async (req, res) => {
       ? notifyPreference
       : (customer?.email ? 'both' : 'line');
 
+    try {
+      notifications.email.shop = await sendOrderShopNotification(order);
+    } catch (err) {
+      notifications.email.shop = { attempted: true, sent: false, reason: err.message };
+    }
+
     if (normalizedNotifyPreference === 'email' || normalizedNotifyPreference === 'both') {
       try {
-        notifications.email = await sendOrderConfirmation(order);
+        notifications.email.customer = await sendOrderConfirmation(order);
       } catch (err) {
-        notifications.email = { attempted: true, sent: false, reason: err.message };
+        notifications.email.customer = { attempted: true, sent: false, reason: err.message };
       }
     }
     if (normalizedNotifyPreference === 'line' || normalizedNotifyPreference === 'both') {
