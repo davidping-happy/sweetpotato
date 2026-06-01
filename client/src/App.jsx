@@ -291,7 +291,7 @@ export default function App() {
             <h5>聯絡我們</h5>
             <ul>
               <li><Phone size={14} /> 0953830409</li>
-              <li><Mail size={14} /> hello@panshi.com</li>
+              <li><Mail size={14} /> sweetpotatograndmom@gmail.com</li>
               <li><MapPin size={14} /> 高雄市左營區華夏路576號</li>
             </ul>
           </div>

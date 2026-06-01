@@ -125,7 +125,7 @@ function buildOrderEmailHTML(order) {
             <p style="margin:0; color:#5D4037; font-size:13px; line-height:1.8;">
               📍 高雄市左營區華夏路576號<br/>
               📞 0953830409<br/>
-              ✉️ hello@panshi.com
+              ✉️ sweetpotatograndmom@gmail.com
             </p>
             <p style="margin:16px 0 0; color:#999; font-size:11px;">
               © 2026 磐石烤地瓜 版權所有
