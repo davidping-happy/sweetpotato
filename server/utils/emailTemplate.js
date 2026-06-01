@@ -1,13 +1,26 @@
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 /**
  * 訂單確認郵件 HTML 範本
  * 品牌色系：橘 #F28C28 / 棕 #5D4037 / 奶油底 #FFF9E6
  */
 function buildOrderEmailHTML(order) {
+  const customerName = escapeHtml(order.customer?.name || '顧客');
+  const customerPhone = escapeHtml(order.customer?.phone || '');
+  const customerAddress = escapeHtml(order.customer?.address || '');
+  const orderNumber = escapeHtml(order.orderNumber);
+
   const itemsRows = order.items
     .map(
       (item) => `
       <tr>
-        <td style="padding:12px 16px; border-bottom:1px solid #f0e6d6;">${item.name}</td>
+        <td style="padding:12px 16px; border-bottom:1px solid #f0e6d6;">${escapeHtml(item.name)}</td>
         <td style="padding:12px 16px; border-bottom:1px solid #f0e6d6; text-align:center;">${item.quantity}</td>
         <td style="padding:12px 16px; border-bottom:1px solid #f0e6d6; text-align:right;">NT$${item.price}</td>
         <td style="padding:12px 16px; border-bottom:1px solid #f0e6d6; text-align:right; font-weight:bold;">NT$${item.price * item.quantity}</td>
@@ -41,7 +54,7 @@ function buildOrderEmailHTML(order) {
           <td style="padding:32px 40px 16px;">
             <h2 style="margin:0 0 8px; color:#5D4037; font-size:22px;">感謝您的訂購！ ❤️</h2>
             <p style="margin:0; color:#5D4037; font-size:15px; line-height:1.6;">
-              ${order.customer.name} 您好，<br/>
+              ${customerName} 您好，<br/>
               您的訂單已成功建立，以下是訂單明細：
             </p>
           </td>
@@ -53,7 +66,7 @@ function buildOrderEmailHTML(order) {
             <table width="100%" style="background:#FFF9E6; border-radius:12px; padding:16px 20px;">
               <tr>
                 <td style="color:#5D4037; font-size:13px;">訂單編號</td>
-                <td style="color:#F28C28; font-size:20px; font-weight:bold; text-align:right; letter-spacing:1px;">${order.orderNumber}</td>
+                <td style="color:#F28C28; font-size:20px; font-weight:bold; text-align:right; letter-spacing:1px;">${orderNumber}</td>
               </tr>
             </table>
           </td>
@@ -107,9 +120,9 @@ function buildOrderEmailHTML(order) {
             <table width="100%" style="background:#FFF9E6; border-radius:12px; padding:16px 20px;">
               <tr><td style="color:#5D4037; font-size:13px; font-weight:600; padding-bottom:8px;">📦 寄送資訊</td></tr>
               <tr><td style="color:#5D4037; font-size:14px; line-height:1.8;">
-                ${order.customer.name}<br/>
-                ${order.customer.phone}<br/>
-                ${order.customer.address}
+                ${customerName}<br/>
+                ${customerPhone}<br/>
+                ${customerAddress}
               </td></tr>
             </table>
           </td>
@@ -173,4 +186,49 @@ function buildOrderShopEmailHTML(order) {
 </html>`;
 }
 
-module.exports = { buildOrderEmailHTML, buildOrderShopEmailHTML };
+/**
+ * 訂單確認郵件純文字版（提高送達率）
+ */
+function buildOrderEmailText(order) {
+  const items = (order.items || [])
+    .map((item) => `- ${item.name} x ${item.quantity} = NT$${item.price * item.quantity}`)
+    .join('\n');
+  const shippingLabel = order.shipping === 0 ? '免運費' : `NT$${order.shipping}`;
+
+  return [
+    '【磐石烤地瓜】訂單確認',
+    '',
+    `${order.customer?.name || '顧客'} 您好，`,
+    `訂單編號：${order.orderNumber}`,
+    '',
+    '商品明細：',
+    items,
+    '',
+    `小計：NT$${order.subtotal}`,
+    `運費：${shippingLabel}`,
+    `總計：NT$${order.total}`,
+    '',
+    '寄送資訊：',
+    `${order.customer?.name || ''}`,
+    `${order.customer?.phone || ''}`,
+    `${order.customer?.address || ''}`,
+    '',
+    '磐石烤地瓜｜高雄市左營區華夏路576號',
+    '0953830409｜sweetpotatograndmom@gmail.com',
+  ].join('\n');
+}
+
+/**
+ * 精簡版客戶確認信（HTML 寄送失敗時備援）
+ */
+function buildOrderEmailSimpleHTML(order) {
+  const text = buildOrderEmailText(order).replace(/\n/g, '<br/>');
+  return `<div style="font-family:Arial,'PingFang TC',sans-serif;color:#5D4037;line-height:1.7;">${text}</div>`;
+}
+
+module.exports = {
+  buildOrderEmailHTML,
+  buildOrderEmailText,
+  buildOrderEmailSimpleHTML,
+  buildOrderShopEmailHTML,
+};

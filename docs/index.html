@@ -1085,6 +1085,8 @@
             if (reason === 'smtp_not_configured') return `${type}：伺服器未設定 SMTP（請在 Render 設定 SMTP_*）`;
             if (reason === 'smtp_auth_failed') return `${type}：SMTP 帳密錯誤（請檢查 Gmail 應用程式密碼）`;
             if (reason === 'smtp_connection_failed') return `${type}：無法連線 SMTP 伺服器`;
+            if (reason === 'recipient_rejected') return `${type}：收件信箱被拒絕，請確認 Email 是否正確`;
+            if (reason === 'no_customer_email') return `${type}：未填寫信箱`;
             if (reason === 'missing_customer_line_user_id') return '您的 LINE：尚未綁定，無法推播';
             if (reason === 'missing_line_channel_token') return '您的 LINE：伺服器未設定 LINE_CHANNEL_ACCESS_TOKEN';
             if (reason === 'missing_line_shop_config') return '店家 LINE：未設定（需 LINE_CHANNEL_ACCESS_TOKEN + LINE_SHOP_USER_ID）';
@@ -1097,16 +1099,26 @@
         function formatEmailNotificationSummary(emailNotifications) {
             if (!emailNotifications) return 'Email：狀態未知';
 
-            // 舊版 API：單一 email 結果
-            if (emailNotifications.customer === undefined && emailNotifications.shop === undefined) {
+            // 舊版 API：單一 email 結果（有 sent / reason 欄位）
+            const isLegacyFlat = emailNotifications.customer === undefined
+                && emailNotifications.shop === undefined
+                && (emailNotifications.sent !== undefined || emailNotifications.reason !== undefined);
+            if (isLegacyFlat) {
                 return formatNotificationStatus('Email', emailNotifications);
             }
 
-            const parts = [
-                formatNotificationStatus('Email（客戶）', emailNotifications.customer),
-                formatNotificationStatus('Email（店家）', emailNotifications.shop),
-            ];
-            return parts.join('\n');
+            const parts = [];
+            const customer = emailNotifications.customer;
+            const shop = emailNotifications.shop;
+
+            if (customer && customer.reason !== 'disabled_by_customer') {
+                parts.push(formatNotificationStatus('Email（客戶）', customer));
+            }
+            if (shop) {
+                parts.push(formatNotificationStatus('Email（店家）', shop));
+            }
+
+            return parts.length ? parts.join('\n') : 'Email：狀態未知';
         }
 
         function formatLineNotificationSummary(line, notifyPreference) {

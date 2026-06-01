@@ -1,7 +1,7 @@
 const express = require('express');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
-const { sendOrderConfirmation, sendOrderShopNotification } = require('../utils/mailer');
+const { sendOrderEmails, toMailOrder } = require('../utils/mailer');
 const { sendLineOrderNotifications } = require('../utils/lineNotifier');
 const { requireAdminAuth } = require('../middleware/requireAdminAuth');
 
@@ -510,18 +510,19 @@ router.post('/', async (req, res) => {
       ? notifyPreference
       : (customer?.email ? 'both' : 'line');
 
-    try {
-      notifications.email.shop = await sendOrderShopNotification(order);
-    } catch (err) {
-      notifications.email.shop = { attempted: true, sent: false, reason: err.message };
-    }
+    const mailOrder = toMailOrder(order);
+    const wantsCustomerEmail = Boolean(mailOrder.customer.email)
+      || normalizedNotifyPreference === 'email'
+      || normalizedNotifyPreference === 'both';
 
-    if (normalizedNotifyPreference === 'email' || normalizedNotifyPreference === 'both') {
-      try {
-        notifications.email.customer = await sendOrderConfirmation(order);
-      } catch (err) {
-        notifications.email.customer = { attempted: true, sent: false, reason: err.message };
-      }
+    try {
+      const emailResults = await sendOrderEmails(order, { sendToCustomer: wantsCustomerEmail });
+      notifications.email.shop = emailResults.shop;
+      notifications.email.customer = emailResults.customer;
+    } catch (err) {
+      const fail = { attempted: true, sent: false, reason: err.message || 'email_send_failed' };
+      notifications.email.shop = fail;
+      notifications.email.customer = fail;
     }
     if (normalizedNotifyPreference === 'line' || normalizedNotifyPreference === 'both') {
       notifications.line = await sendLineOrderNotifications(order, {

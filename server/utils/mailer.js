@@ -1,9 +1,10 @@
 const nodemailer = require('nodemailer');
-const { buildOrderEmailHTML, buildOrderShopEmailHTML } = require('./emailTemplate');
-
-let transporter = null;
-let smtpVerified = false;
-let smtpVerifyFailedReason = '';
+const {
+  buildOrderEmailHTML,
+  buildOrderEmailText,
+  buildOrderEmailSimpleHTML,
+  buildOrderShopEmailHTML,
+} = require('./emailTemplate');
 
 function trimEnv(value) {
   return String(value || '').trim();
@@ -13,7 +14,12 @@ function normalizeSmtpError(err) {
   const msg = String(err?.message || 'send_failed');
   if (/invalid login|authentication|535|534|auth/i.test(msg)) return 'smtp_auth_failed';
   if (/certificate|TLS|ECONNREFUSED|ETIMEDOUT|ENOTFOUND/i.test(msg)) return 'smtp_connection_failed';
+  if (/550|552|553|mailbox|recipient|rejected/i.test(msg)) return 'recipient_rejected';
   return msg;
+}
+
+function getMailFrom() {
+  return process.env.SMTP_FROM || process.env.SMTP_USER;
 }
 
 function createTransporter() {
@@ -33,47 +39,43 @@ function createTransporter() {
   });
 }
 
-async function getVerifiedTransporter() {
-  if (smtpVerifyFailedReason) {
-    return { transporter: null, reason: smtpVerifyFailedReason };
-  }
+/**
+ * 將 Mongoose 文件或一般物件轉成寄信用的純物件
+ */
+function toMailOrder(order) {
+  const plain = typeof order?.toObject === 'function' ? order.toObject() : { ...order };
 
-  if (!transporter) {
-    transporter = createTransporter();
-  }
-
-  if (!transporter) {
-    return { transporter: null, reason: 'smtp_not_configured' };
-  }
-
-  if (!smtpVerified) {
-    try {
-      await transporter.verify();
-      smtpVerified = true;
-      console.log('✅ SMTP 連線驗證成功');
-    } catch (err) {
-      smtpVerifyFailedReason = normalizeSmtpError(err);
-      console.error('❌ SMTP 連線驗證失敗:', err.message);
-      transporter = null;
-      return { transporter: null, reason: smtpVerifyFailedReason };
-    }
-  }
-
-  return { transporter, reason: '' };
+  return {
+    orderNumber: plain.orderNumber,
+    items: (plain.items || []).map((item) => ({
+      name: item.name,
+      price: Number(item.price),
+      quantity: Number(item.quantity),
+    })),
+    subtotal: Number(plain.subtotal),
+    shipping: Number(plain.shipping),
+    total: Number(plain.total),
+    customer: {
+      name: trimEnv(plain.customer?.name),
+      email: trimEnv(plain.customer?.email),
+      phone: trimEnv(plain.customer?.phone),
+      address: trimEnv(plain.customer?.address),
+      lineUserId: trimEnv(plain.customer?.lineUserId),
+    },
+  };
 }
 
 /**
- * @param {{ to: string, subject: string, html: string, logLabel: string }} params
+ * @param {{ to: string, subject: string, html: string, text?: string, logLabel: string }} params
  */
-async function deliverEmail({ to, subject, html, logLabel }) {
+async function deliverEmail({ to, subject, html, text, logLabel }) {
   const recipient = trimEnv(to);
   if (!recipient) {
     return { attempted: false, sent: false, reason: 'missing_recipient' };
   }
 
-  const { transporter: activeTransporter, reason } = await getVerifiedTransporter();
-
-  if (!activeTransporter) {
+  const transporter = createTransporter();
+  if (!transporter) {
     console.log('──────────────────────────────────');
     console.log(`📧 模擬寄送：${logLabel}`);
     console.log(`   收件人: ${recipient}`);
@@ -82,18 +84,34 @@ async function deliverEmail({ to, subject, html, logLabel }) {
     return {
       attempted: true,
       sent: false,
-      reason: reason || 'smtp_not_configured',
+      reason: 'smtp_not_configured',
       recipient,
     };
   }
 
   try {
-    const info = await activeTransporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+    await transporter.verify();
+  } catch (err) {
+    console.error(`❌ SMTP 驗證失敗（${logLabel}）:`, err.message);
+    transporter.close();
+    return {
+      attempted: true,
+      sent: false,
+      reason: normalizeSmtpError(err),
+      recipient,
+    };
+  }
+
+  try {
+    const info = await transporter.sendMail({
+      from: getMailFrom(),
       to: recipient,
+      replyTo: getShopNotifyEmail(),
       subject,
       html,
+      text: text || undefined,
     });
+    transporter.close();
     console.log(`✅ ${logLabel} 已寄送: ${info.messageId} → ${recipient}`);
     return {
       attempted: true,
@@ -102,11 +120,14 @@ async function deliverEmail({ to, subject, html, logLabel }) {
       recipient,
     };
   } catch (err) {
+    transporter.close();
+    const reason = normalizeSmtpError(err);
     console.error(`❌ ${logLabel} 寄送失敗 (${recipient}):`, err.message);
     return {
       attempted: true,
       sent: false,
-      reason: normalizeSmtpError(err),
+      reason,
+      detail: err.message,
       recipient,
     };
   }
@@ -117,29 +138,40 @@ function getShopNotifyEmail() {
 }
 
 /**
- * 寄送訂單確認郵件給客戶
- * @param {Object} order
+ * 寄送訂單確認郵件給客戶（失敗時以精簡版重試一次）
  */
 async function sendOrderConfirmation(order) {
-  const customerEmail = trimEnv(order.customer?.email);
+  const mailOrder = toMailOrder(order);
+  const customerEmail = mailOrder.customer.email;
   if (!customerEmail) {
     return { attempted: false, sent: false, reason: 'missing_customer_email' };
   }
 
-  const html = buildOrderEmailHTML(order);
-  const subject = `【磐石烤地瓜】訂單確認 — ${order.orderNumber}`;
+  const subject = `【磐石烤地瓜】訂單確認 - ${mailOrder.orderNumber}`;
+  const primary = await deliverEmail({
+    to: customerEmail,
+    subject,
+    html: buildOrderEmailHTML(mailOrder),
+    text: buildOrderEmailText(mailOrder),
+    logLabel: '訂單確認郵件（客戶）',
+  });
 
+  if (primary.sent || primary.reason === 'smtp_not_configured') {
+    return primary;
+  }
+
+  console.log('↻ 客戶確認信改用精簡版重試...');
   return deliverEmail({
     to: customerEmail,
     subject,
-    html,
-    logLabel: '訂單確認郵件（客戶）',
+    html: buildOrderEmailSimpleHTML(mailOrder),
+    text: buildOrderEmailText(mailOrder),
+    logLabel: '訂單確認郵件（客戶・精簡重試）',
   });
 }
 
 /**
  * 寄送新訂單通知給店家
- * @param {Object} order
  */
 async function sendOrderShopNotification(order) {
   const shopEmail = getShopNotifyEmail();
@@ -147,21 +179,50 @@ async function sendOrderShopNotification(order) {
     return { attempted: false, sent: false, reason: 'missing_shop_email' };
   }
 
-  const html = buildOrderShopEmailHTML(order);
-  const subject = `【磐石烤地瓜】新訂單 — ${order.orderNumber}`;
+  const mailOrder = toMailOrder(order);
+  const subject = `【磐石烤地瓜】新訂單 - ${mailOrder.orderNumber}`;
 
   return deliverEmail({
     to: shopEmail,
     subject,
-    html,
+    html: buildOrderShopEmailHTML(mailOrder),
     logLabel: '新訂單通知（店家）',
   });
 }
 
 /**
- * 寄送後台密碼重設郵件
- * @param {{ to: string, resetUrl: string }} params
+ * 同時寄送店家與客戶郵件（各自獨立連線，避免第二封失敗）
  */
+async function sendOrderEmails(order, { sendToCustomer }) {
+  const mailOrder = toMailOrder(order);
+  const shopPromise = sendOrderShopNotification(mailOrder);
+
+  let customerPromise = Promise.resolve({
+    attempted: false,
+    sent: false,
+    reason: 'no_customer_email',
+  });
+
+  if (sendToCustomer && mailOrder.customer.email) {
+    customerPromise = sendOrderConfirmation(mailOrder);
+  } else if (sendToCustomer) {
+    customerPromise = Promise.resolve({
+      attempted: true,
+      sent: false,
+      reason: 'missing_customer_email',
+    });
+  } else {
+    customerPromise = Promise.resolve({
+      attempted: false,
+      sent: false,
+      reason: 'disabled_by_customer',
+    });
+  }
+
+  const [shop, customer] = await Promise.all([shopPromise, customerPromise]);
+  return { shop, customer };
+}
+
 async function sendAdminPasswordResetEmail({ to, resetUrl }) {
   const recipient = trimEnv(to);
   if (!recipient) {
@@ -249,8 +310,10 @@ async function sendNewsletterAdminNotification(email) {
 }
 
 module.exports = {
+  toMailOrder,
   sendOrderConfirmation,
   sendOrderShopNotification,
+  sendOrderEmails,
   sendAdminPasswordResetEmail,
   sendNewsletterWelcomeEmail,
   sendNewsletterAdminNotification,
