@@ -4,7 +4,9 @@ const mongoose = require('mongoose');
 const Order = require('../models/Order');
 const Product = require('../models/Product');
 
-const FALLBACK_DATA_DIR = path.join(__dirname, '..', 'data');
+const FALLBACK_DATA_DIR = process.env.ORDER_DATA_DIR
+  ? path.resolve(process.env.ORDER_DATA_DIR)
+  : path.join(__dirname, '..', 'data');
 const FALLBACK_ORDERS_FILE = path.join(FALLBACK_DATA_DIR, 'orders.json');
 
 let fallbackWriteQueue = Promise.resolve();

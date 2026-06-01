@@ -1,0 +1,20 @@
+# 磐石烤地瓜 — VPS 部署（訂單持久化至 server/data/orders.json）
+# 使用：在專案根目錄執行 docker compose up -d --build
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: sweetpotato-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-3000}:3000"
+    env_file:
+      - server/.env
+    environment:
+      ORDER_DATA_DIR: /app/server/data
+      NODE_ENV: production
+    volumes:
+      # 訂單、電子報等寫入此目錄，重啟容器不會消失
+      - ./server/data:/app/server/data

@@ -99,11 +99,15 @@ app.get('/api/health', (req, res) => {
 
 // ============ 資料庫連線 & 啟動 ============
 async function connectMongo() {
-  const mongoURI = process.env.MONGODB_URI || 'mongodb://localhost:27017/panshi';
+  const mongoURI = String(process.env.MONGODB_URI || '').trim();
+  if (!mongoURI) {
+    console.log('ℹ️  未設定 MONGODB_URI，訂單將儲存於 data/orders.json（適合 VPS + 永久磁碟）');
+    return false;
+  }
 
   // 嘗試連接外部 MongoDB
   try {
-    console.log('🔗 嘗試連接 MongoDB...', mongoURI);
+    console.log('🔗 嘗試連接 MongoDB...', mongoURI.replace(/\/\/([^:]+):([^@]+)@/, '//$1:***@'));
     await mongoose.connect(mongoURI, { serverSelectionTimeoutMS: 3000 });
     console.log('✅ MongoDB 連線成功');
     return true;

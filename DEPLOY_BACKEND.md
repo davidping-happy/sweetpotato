@@ -35,33 +35,32 @@ Verify:
 
 Use this URL in `admin.html` "API URL" input.
 
-## Option C: VPS + Docker
+## Option C: VPS + Docker (persistent orders without MongoDB)
 
-Prerequisites:
+**Recommended if you do not want MongoDB Atlas.**
 
-- Docker installed on VPS
-- Port 3000 open (or reverse proxy to HTTPS)
+Orders are stored in `server/data/orders.json` on a mounted volume. Data survives container restarts.
 
-Commands:
+See the full guide (Traditional Chinese): [docs/DEPLOY_VPS.md](docs/DEPLOY_VPS.md)
 
-```bash
-git clone https://github.com/<your-user>/sweetpotato.git
-cd sweetpotato/server
-docker build -t sweetpotato-api .
-docker run -d --name sweetpotato-api -p 3000:3000 sweetpotato-api
-```
-
-Verify:
+Quick start on VPS:
 
 ```bash
-curl http://<your-vps-ip>:3000/api/health
+git clone https://github.com/davidping-happy/sweetpotato.git
+cd sweetpotato
+cp server/.env.vps.example server/.env
+# edit server/.env (ADMIN_*, PUBLIC_API_BASE_URL, SMTP, etc.)
+mkdir -p server/data
+docker compose up -d --build
+curl http://127.0.0.1:3000/api/health
 ```
 
-## MongoDB (optional but recommended)
+## MongoDB (optional)
 
-If `MONGODB_URI` is not set, backend runs in memory fallback mode:
+| Deployment | `MONGODB_URI` | Order storage |
+|------------|---------------|---------------|
+| VPS + Docker volume | leave empty | `server/data/orders.json` (persistent) |
+| Render free | Atlas recommended | JSON file is wiped on redeploy |
+| Any + Atlas | set connection string | MongoDB |
 
-- Orders are available during runtime
-- Data is lost when service restarts
-
-For persistent orders, configure `MONGODB_URI` (e.g., MongoDB Atlas) in your cloud provider environment variables.
+If `MONGODB_URI` is empty, the API skips MongoDB and uses the JSON file store.
