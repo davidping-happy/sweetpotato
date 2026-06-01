@@ -16,8 +16,12 @@ const newsletterRouter = require('./routes/newsletter');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const FALLBACK_DATA_DIR = path.join(__dirname, 'data');
-const FALLBACK_ORDERS_FILE = path.join(FALLBACK_DATA_DIR, 'orders.json');
 const FALLBACK_NEWSLETTER_FILE = path.join(FALLBACK_DATA_DIR, 'newsletter-subscribers.json');
+const {
+  syncFallbackOrders,
+  migrateFallbackOrdersToMongo,
+  saveFallbackOrdersToFile,
+} = require('./utils/orderPersistence');
 
 // ====== DB fallback (no Mongo / no mongodb-memory-server) ======
 const fallbackProducts = seedProducts.map((p, idx) => ({
@@ -34,18 +38,6 @@ app.locals.db = {
   saveFallbackOrders: async () => {},
   saveFallbackNewsletterSubscribers: async () => {},
 };
-
-async function loadFallbackOrdersFromFile() {
-  try {
-    await fs.mkdir(FALLBACK_DATA_DIR, { recursive: true });
-    const raw = await fs.readFile(FALLBACK_ORDERS_FILE, 'utf8');
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return parsed;
-  } catch {
-    return [];
-  }
-}
 
 async function saveFallbackNewsletterSubscribersToFile(subscribers) {
   try {
@@ -65,15 +57,6 @@ async function loadFallbackNewsletterSubscribersFromFile() {
     return parsed;
   } catch {
     return [];
-  }
-}
-
-async function saveFallbackOrdersToFile(orders) {
-  try {
-    await fs.mkdir(FALLBACK_DATA_DIR, { recursive: true });
-    await fs.writeFile(FALLBACK_ORDERS_FILE, JSON.stringify(orders, null, 2), 'utf8');
-  } catch (err) {
-    console.error('⚠️  寫入 fallback 訂單檔失敗:', err.message);
   }
 }
 
@@ -136,21 +119,23 @@ async function startServer() {
     const dbReady = await connectMongo();
     app.locals.db.ready = dbReady;
 
-    // memory fallback 模式：啟動時先載入已保存訂單，並提供保存函式
-    if (!dbReady) {
-      app.locals.db.fallbackOrders = await loadFallbackOrdersFromFile();
-      app.locals.db.fallbackNewsletterSubscribers = await loadFallbackNewsletterSubscribersFromFile();
-      app.locals.db.saveFallbackOrders = async () => {
-        await saveFallbackOrdersToFile(app.locals.db.fallbackOrders || []);
-      };
-      app.locals.db.saveFallbackNewsletterSubscribers = async () => {
-        await saveFallbackNewsletterSubscribersToFile(app.locals.db.fallbackNewsletterSubscribers || []);
-      };
-      console.log(`🗂️  fallback 訂單已載入 ${app.locals.db.fallbackOrders.length} 筆`);
-      console.log(`📰 fallback 電子報訂閱已載入 ${app.locals.db.fallbackNewsletterSubscribers.length} 筆`);
-    }
+    // 一律載入 fallback 訂單檔（Mongo 模式也會備份；無 Mongo 時為主要儲存）
+    const loadedOrders = await syncFallbackOrders(app);
+    app.locals.db.saveFallbackOrders = async () => {
+      await syncFallbackOrders(app);
+      await saveFallbackOrdersToFile(app.locals.db.fallbackOrders || []);
+    };
+
+    app.locals.db.fallbackNewsletterSubscribers = await loadFallbackNewsletterSubscribersFromFile();
+    app.locals.db.saveFallbackNewsletterSubscribers = async () => {
+      await saveFallbackNewsletterSubscribersToFile(app.locals.db.fallbackNewsletterSubscribers || []);
+    };
+    console.log(`🗂️  fallback 訂單已載入 ${loadedOrders.length} 筆`);
+    console.log(`📰 fallback 電子報訂閱已載入 ${app.locals.db.fallbackNewsletterSubscribers.length} 筆`);
 
     if (dbReady) {
+      await migrateFallbackOrdersToMongo();
+      await syncFallbackOrders(app);
       // 自動 seed：若商品表為空則寫入初始資料
       const count = await Product.countDocuments();
       if (count === 0) {

@@ -2,6 +2,11 @@ const express = require('express');
 const Product = require('../models/Product');
 const Order = require('../models/Order');
 const { sendOrderEmails, toMailOrder } = require('../utils/mailer');
+const {
+  syncFallbackOrders,
+  appendFallbackOrder,
+  toFallbackPlainOrder,
+} = require('../utils/orderPersistence');
 const { sendLineOrderNotifications } = require('../utils/lineNotifier');
 const { requireAdminAuth } = require('../middleware/requireAdminAuth');
 
@@ -144,14 +149,25 @@ router.get('/', requireAdminAuth, async (req, res) => {
         .limit(limit)
         .lean();
 
+      // 合併尚未匯入 Mongo 的 fallback 訂單（避免舊資料消失）
+      await syncFallbackOrders(req.app);
+      const mongoNumbers = new Set(orders.map((o) => o.orderNumber));
+      const fallbackOnly = (req.app.locals.db.fallbackOrders || [])
+        .filter((o) => o.orderNumber && !mongoNumbers.has(o.orderNumber))
+        .map(formatOrderForList);
+      const merged = [...orders.map(formatOrderForList), ...fallbackOnly]
+        .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+        .slice(0, limit);
+
       return res.json({
         success: true,
         source: 'mongodb',
-        count: orders.length,
-        data: orders.map(formatOrderForList),
+        count: merged.length,
+        data: merged,
       });
     }
 
+    await syncFallbackOrders(req.app);
     const fallbackOrders = req.app.locals.db?.fallbackOrders || [];
     const sorted = [...fallbackOrders].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, limit);
     return res.json({
@@ -182,6 +198,7 @@ router.get('/:orderNumber', requireAdminAuth, async (req, res) => {
       return res.json({ success: true, source: 'mongodb', data: formatOrderDetail(order) });
     }
 
+    await syncFallbackOrders(req.app);
     const fallbackOrders = req.app.locals.db?.fallbackOrders || [];
     const order = fallbackOrders.find((o) => o.orderNumber === orderNumber);
     if (!order) {
@@ -244,6 +261,7 @@ router.patch('/:orderNumber/status', requireAdminAuth, async (req, res) => {
         { status, $push: { statusHistory: historyEntry } },
         { new: true },
       ).lean();
+      await appendFallbackOrder(req.app, toFallbackPlainOrder(updated));
       return res.json({
         success: true,
         source: 'mongodb',
@@ -252,6 +270,7 @@ router.patch('/:orderNumber/status', requireAdminAuth, async (req, res) => {
       });
     }
 
+    await syncFallbackOrders(req.app);
     const fallbackOrders = req.app.locals.db?.fallbackOrders || [];
     const target = fallbackOrders.find((o) => o.orderNumber === orderNumber);
     if (!target) {
@@ -283,7 +302,7 @@ router.patch('/:orderNumber/status', requireAdminAuth, async (req, res) => {
       changedBy,
       changedAt: new Date(),
     });
-    await req.app.locals.db.saveFallbackOrders();
+    await appendFallbackOrder(req.app, target);
     return res.json({
       success: true,
       source: 'memory',
@@ -467,6 +486,7 @@ router.post('/', async (req, res) => {
           changedAt: new Date(),
         }],
       });
+      await appendFallbackOrder(req.app, toFallbackPlainOrder(order));
     } else {
       order = {
         orderNumber,
@@ -490,8 +510,7 @@ router.post('/', async (req, res) => {
         }],
         createdAt: new Date(),
       };
-      req.app.locals.db.fallbackOrders.push(order);
-      await req.app.locals.db.saveFallbackOrders();
+      await appendFallbackOrder(req.app, order);
     }
 
     // --- 通知（Email / LINE） ---
