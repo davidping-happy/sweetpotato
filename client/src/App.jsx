@@ -297,7 +297,7 @@ export default function App() {
           </div>
         </div>
         <div className="footer-bottom">
-          <p>© 2024 磐石烤地瓜 - 番薯阿嬤 版權所有</p>
+          <p>© 2026 磐石烤地瓜 - 番薯阿嬤 版權所有</p>
           <div>
             <a href="#">隱私政策</a>
             <a href="#">服務條款</a>

@@ -128,7 +128,7 @@ function buildOrderEmailHTML(order) {
               ✉️ hello@panshi.com
             </p>
             <p style="margin:16px 0 0; color:#999; font-size:11px;">
-              © 2024 磐石烤地瓜 版權所有
+              © 2026 磐石烤地瓜 版權所有
             </p>
           </td>
         </tr>
