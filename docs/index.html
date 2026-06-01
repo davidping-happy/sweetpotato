@@ -399,7 +399,7 @@
         </section>
 
         <!-- Footer -->
-        <footer class="bg-surface-container py-16">
+        <footer class="bg-surface-container py-16" id="location">
             <div class="max-w-screen-xl mx-auto px-6 grid grid-cols-1 md:grid-cols-4 gap-12">
                 <div class="col-span-1 md:col-span-2 space-y-6">
                     <h4 class="font-headline text-2xl font-extrabold text-primary">磐石烤地瓜</h4>
@@ -408,9 +408,9 @@
                 <div class="space-y-4">
                     <h5 class="font-bold text-secondary">快速連結</h5>
                     <ul class="space-y-2 text-secondary/70 text-sm">
-                        <li><a class="hover:text-primary transition-colors" href="#">關於我們</a></li>
+                        <li><a class="hover:text-primary transition-colors" href="#story">關於我們</a></li>
                         <li><a class="hover:text-primary transition-colors" href="#products">產品系列</a></li>
-                        <li><a class="hover:text-primary transition-colors" href="#">美味據點</a></li>
+                        <li><a class="hover:text-primary transition-colors" href="#location">美味據點</a></li>
                     </ul>
                 </div>
                 <div class="space-y-4">
@@ -418,15 +418,18 @@
                     <ul class="space-y-2 text-secondary/70 text-sm">
                         <li class="flex items-center gap-2"><i class="w-4 h-4" data-lucide="phone"></i> 0953830409</li>
                         <li class="flex items-center gap-2"><i class="w-4 h-4" data-lucide="mail"></i> hello@panshi.com</li>
-                        <li class="flex items-center gap-2 text-balance"><i class="w-4 h-4" data-lucide="map-pin"></i> 高雄市左營區華夏路576號</li>
+                        <li class="flex items-center gap-2 text-balance">
+                            <i class="w-4 h-4" data-lucide="map-pin"></i>
+                            <a class="hover:text-primary transition-colors" href="https://www.google.com/maps/search/?api=1&amp;query=%E9%AB%98%E9%9B%84%E5%B8%82%E5%B7%A6%E7%87%9F%E5%8D%80%E8%8F%AF%E5%A4%8F%E8%B7%AF576%E8%99%9F" target="_blank" rel="noopener noreferrer">高雄市左營區華夏路576號</a>
+                        </li>
                     </ul>
                 </div>
             </div>
             <div class="max-w-screen-xl mx-auto px-6 mt-16 pt-8 border-t border-outline/20 flex flex-col md:flex-row justify-between items-center gap-4 text-secondary/50 text-xs font-medium">
                 <p>© 2024 磐石烤地瓜 - 番薯阿嬤 版權所有</p>
                 <div class="flex gap-6">
-                    <a href="#">隱私政策</a>
-                    <a href="#">服務條款</a>
+                    <a class="hover:text-primary transition-colors" href="./privacy.html">隱私政策</a>
+                    <a class="hover:text-primary transition-colors" href="./terms.html">服務條款</a>
                 </div>
             </div>
         </footer>
