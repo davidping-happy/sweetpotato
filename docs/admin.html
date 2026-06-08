@@ -57,6 +57,13 @@
         <span id="status" class="muted">尚未載入</span>
       </div>
       <div class="row" style="margin-top: 10px;">
+        <button id="downloadJsonBtn" class="secondary">下載訂單備份（JSON）</button>
+        <button id="downloadCsvBtn" class="secondary">下載訂單（Excel/CSV）</button>
+        <button id="importBtn" class="secondary">還原訂單（匯入備份）</button>
+        <input id="importFile" type="file" accept=".json,application/json" style="display:none;" />
+        <span id="backupHint" class="muted">每次系統更新前，建議先「下載備份」；更新後若紀錄消失，用「還原訂單」匯回。</span>
+      </div>
+      <div class="row" style="margin-top: 10px;">
         <select id="statusFilter">
           <option value="">全部狀態</option>
           <option value="pending">待處理</option>
@@ -399,9 +406,73 @@
       window.location.replace('./admin-login.html');
     }
 
+    async function downloadOrders(format) {
+      statusEl.className = 'muted';
+      statusEl.textContent = `準備下載訂單備份（${format.toUpperCase()}）...`;
+      try {
+        const headers = await getAuthHeaders();
+        const res = await fetch(apiUrl(`/api/orders/export?format=${format}`), { headers });
+        if (!res.ok) throw new Error(`下載失敗（HTTP ${res.status}）`);
+        const blob = await res.blob();
+        const stamp = new Date().toISOString().slice(0, 10);
+        const ext = format === 'csv' ? 'csv' : 'json';
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `orders-${stamp}.${ext}`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+        statusEl.className = 'ok';
+        statusEl.textContent = `✅ 已下載訂單備份（${ext.toUpperCase()}）`;
+      } catch (err) {
+        statusEl.className = 'err';
+        statusEl.textContent = `下載失敗：${err.message}`;
+      }
+    }
+
+    async function importOrdersFromFile(file) {
+      if (!file) return;
+      statusEl.className = 'muted';
+      statusEl.textContent = '讀取備份檔...';
+      try {
+        const text = await file.text();
+        let parsed;
+        try {
+          parsed = JSON.parse(text);
+        } catch (_) {
+          throw new Error('檔案不是有效的 JSON 備份');
+        }
+        const headers = await getAuthHeaders();
+        statusEl.textContent = '匯入中...';
+        const res = await fetch(apiUrl('/api/orders/import'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...headers },
+          body: JSON.stringify(Array.isArray(parsed) ? parsed : (parsed.data || parsed)),
+        });
+        const json = await res.json();
+        if (!res.ok || !json.success) throw new Error(json.message || '匯入失敗');
+        statusEl.className = 'ok';
+        statusEl.textContent = `✅ ${json.message}`;
+        await loadOrders();
+      } catch (err) {
+        statusEl.className = 'err';
+        statusEl.textContent = `匯入失敗：${err.message}`;
+      }
+    }
+
     document.getElementById('reloadBtn').addEventListener('click', loadOrders);
     logoutBtn.addEventListener('click', logout);
     document.getElementById('testApiBtn').addEventListener('click', testApiConnection);
+    document.getElementById('downloadJsonBtn').addEventListener('click', () => downloadOrders('json'));
+    document.getElementById('downloadCsvBtn').addEventListener('click', () => downloadOrders('csv'));
+    document.getElementById('importBtn').addEventListener('click', () => document.getElementById('importFile').click());
+    document.getElementById('importFile').addEventListener('change', (e) => {
+      const file = e.target.files && e.target.files[0];
+      importOrdersFromFile(file);
+      e.target.value = '';
+    });
     statusFilter.addEventListener('change', applyOrderFilters);
     timeSort.addEventListener('change', applyOrderFilters);
     keywordSearch.addEventListener('input', applyOrderFilters);

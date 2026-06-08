@@ -171,6 +171,127 @@ function toFallbackPlainOrder(order) {
   };
 }
 
+function normalizeImportedOrder(raw) {
+  if (!raw || !raw.orderNumber) return null;
+  const items = Array.isArray(raw.items) ? raw.items : [];
+  return {
+    orderNumber: String(raw.orderNumber),
+    items: items.map((item) => ({
+      productId: item.productId ? String(item.productId) : '',
+      name: String(item.name || ''),
+      price: Number(item.price) || 0,
+      quantity: Number(item.quantity) || 0,
+    })),
+    subtotal: Number(raw.subtotal) || 0,
+    shipping: Number(raw.shipping) || 0,
+    total: Number(raw.total) || 0,
+    customer: {
+      name: raw.customer?.name || '',
+      email: raw.customer?.email || '',
+      phone: raw.customer?.phone || '',
+      address: raw.customer?.address || '',
+      lineUserId: raw.customer?.lineUserId || '',
+    },
+    status: raw.status || 'pending',
+    statusHistory: Array.isArray(raw.statusHistory) ? raw.statusHistory : [],
+    createdAt: raw.createdAt ? new Date(raw.createdAt).toISOString() : new Date().toISOString(),
+    updatedAt: raw.updatedAt ? new Date(raw.updatedAt).toISOString() : undefined,
+  };
+}
+
+/**
+ * 匯入一批訂單（合併，不覆蓋既有；以 orderNumber 為準）
+ * 回傳 { imported, skipped, total }
+ */
+async function importOrders(app, incomingOrders) {
+  const incoming = (Array.isArray(incomingOrders) ? incomingOrders : [])
+    .map(normalizeImportedOrder)
+    .filter(Boolean);
+
+  if (!incoming.length) {
+    return { imported: 0, skipped: 0, total: 0 };
+  }
+
+  let imported = 0;
+  let skipped = 0;
+
+  // 寫入 MongoDB（若已連線）
+  if (app.locals.db?.ready) {
+    for (const raw of incoming) {
+      const exists = await Order.findOne({ orderNumber: raw.orderNumber }).select('_id').lean();
+      if (exists) { skipped += 1; continue; }
+
+      const items = [];
+      for (const item of raw.items) {
+        const productId = await resolveProductIdForMigration(item);
+        if (!productId) continue;
+        items.push({
+          productId,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+        });
+      }
+      if (!items.length) { skipped += 1; continue; }
+
+      await Order.create({
+        orderNumber: raw.orderNumber,
+        items,
+        subtotal: raw.subtotal,
+        shipping: raw.shipping,
+        total: raw.total,
+        customer: raw.customer,
+        status: raw.status,
+        statusHistory: raw.statusHistory.length
+          ? raw.statusHistory
+          : [{ from: 'created', to: raw.status, changedBy: 'import', changedAt: new Date(raw.createdAt) }],
+        createdAt: new Date(raw.createdAt),
+      });
+      imported += 1;
+    }
+  }
+
+  // 一律也寫入 fallback 檔（雙重備份）
+  await queueFallbackWrite(async () => {
+    await syncFallbackOrders(app);
+    const list = app.locals.db.fallbackOrders;
+    for (const raw of incoming) {
+      const idx = list.findIndex((o) => o.orderNumber === raw.orderNumber);
+      if (idx >= 0) {
+        if (!app.locals.db?.ready) skipped += 1;
+      } else {
+        list.push(raw);
+        if (!app.locals.db?.ready) imported += 1;
+      }
+    }
+    await saveFallbackOrdersToFile(list);
+  });
+
+  return { imported, skipped, total: incoming.length };
+}
+
+/**
+ * 讀取所有訂單（Mongo + fallback 合併），供匯出使用
+ */
+async function getAllOrders(app) {
+  const all = new Map();
+
+  if (app.locals.db?.ready) {
+    const mongoOrders = await Order.find({}).sort({ createdAt: -1 }).lean();
+    for (const o of mongoOrders) {
+      all.set(o.orderNumber, toFallbackPlainOrder(o));
+    }
+  }
+
+  await syncFallbackOrders(app);
+  for (const o of app.locals.db.fallbackOrders || []) {
+    if (!all.has(o.orderNumber)) all.set(o.orderNumber, o);
+  }
+
+  return Array.from(all.values())
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+}
+
 module.exports = {
   FALLBACK_ORDERS_FILE,
   loadFallbackOrdersFromFile,
@@ -179,4 +300,6 @@ module.exports = {
   appendFallbackOrder,
   migrateFallbackOrdersToMongo,
   toFallbackPlainOrder,
+  importOrders,
+  getAllOrders,
 };

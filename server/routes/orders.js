@@ -6,6 +6,8 @@ const {
   syncFallbackOrders,
   appendFallbackOrder,
   toFallbackPlainOrder,
+  importOrders,
+  getAllOrders,
 } = require('../utils/orderPersistence');
 const { sendLineOrderNotifications } = require('../utils/lineNotifier');
 const { requireAdminAuth } = require('../middleware/requireAdminAuth');
@@ -135,6 +137,82 @@ function validateStatusTransition(currentStatus, nextStatus) {
   }
   return { ok: true, unchanged: false };
 }
+
+function buildOrdersCsv(orders) {
+  const header = ['訂單編號', '建立時間', '狀態', '姓名', '電話', 'Email', '地址', '商品明細', '小計', '運費', '總計'];
+  const escape = (val) => {
+    const s = String(val ?? '');
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const rows = orders.map((o) => {
+    const itemsText = (o.items || [])
+      .map((it) => `${it.name} x${it.quantity}`)
+      .join(' / ');
+    return [
+      o.orderNumber,
+      o.createdAt ? new Date(o.createdAt).toLocaleString('zh-TW') : '',
+      o.status,
+      o.customer?.name || '',
+      o.customer?.phone || '',
+      o.customer?.email || '',
+      o.customer?.address || '',
+      itemsText,
+      o.subtotal,
+      o.shipping,
+      o.total,
+    ].map(escape).join(',');
+  });
+  // 加上 BOM，Excel 開啟中文不亂碼
+  return `\uFEFF${[header.join(','), ...rows].join('\r\n')}`;
+}
+
+// ============ GET /api/orders/export ============
+// 匯出全部訂單：?format=csv 下載 CSV，預設 JSON
+router.get('/export', requireAdminAuth, async (req, res) => {
+  try {
+    const orders = await getAllOrders(req.app);
+    const stamp = new Date().toISOString().slice(0, 10);
+
+    if (String(req.query.format).toLowerCase() === 'csv') {
+      const csv = buildOrdersCsv(orders);
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="orders-${stamp}.csv"`);
+      return res.send(csv);
+    }
+
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="orders-${stamp}.json"`);
+    return res.send(JSON.stringify(orders, null, 2));
+  } catch (err) {
+    console.error('匯出訂單失敗:', err);
+    return res.status(500).json({ success: false, message: '匯出訂單失敗' });
+  }
+});
+
+// ============ POST /api/orders/import ============
+// 匯入/還原訂單（合併，不覆蓋既有）。body 可為陣列或 { data: [...] }
+router.post('/import', requireAdminAuth, async (req, res) => {
+  try {
+    const body = req.body;
+    const incoming = Array.isArray(body) ? body : (Array.isArray(body?.data) ? body.data : null);
+    if (!incoming) {
+      return res.status(400).json({
+        success: false,
+        message: '格式錯誤：請上傳訂單 JSON 陣列（或 { "data": [...] }）',
+      });
+    }
+
+    const result = await importOrders(req.app, incoming);
+    return res.json({
+      success: true,
+      message: `匯入完成：新增 ${result.imported} 筆，略過 ${result.skipped} 筆（共 ${result.total} 筆）`,
+      ...result,
+    });
+  } catch (err) {
+    console.error('匯入訂單失敗:', err);
+    return res.status(500).json({ success: false, message: err.message || '匯入訂單失敗' });
+  }
+});
 
 // ============ GET /api/orders ============
 // 簡易後台查詢：支援 MongoDB 與 in-memory fallback 兩種模式
