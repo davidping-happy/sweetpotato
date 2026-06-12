@@ -9,7 +9,19 @@
  * 需先在 server/.env 設定 LINE_CHANNEL_ACCESS_TOKEN（建議也設 LINE_LIFF_ID）。
  * 注意：broadcast 有每月則數上限，請斟酌使用。
  */
-require('dotenv').config({ path: require('path').join(__dirname, '..', 'server', '.env') });
+(function loadEnv() {
+  const path = require('path');
+  const envPath = path.join(__dirname, '..', 'server', '.env');
+  try {
+    require('dotenv').config({ path: envPath });
+  } catch {
+    try {
+      require(path.join(__dirname, '..', 'server', 'node_modules', 'dotenv')).config({ path: envPath });
+    } catch {
+      console.warn('⚠️  找不到 dotenv，將直接使用環境變數。');
+    }
+  }
+})();
 const { buildPromoBanner, buildTextMessage } = require('../server/utils/lineFlex');
 const { getStoreLink, getPromoImageUrl, broadcastMessage, pushMessage, isMessagingConfigured } = require('../server/utils/lineMessaging');
 

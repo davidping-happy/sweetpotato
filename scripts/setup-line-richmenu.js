@@ -16,9 +16,22 @@
  *   │ (開 LIFF)     │ (傳「菜單」)  │ (傳「客服」)   │
  *   └──────────────┴──────────────┴──────────────┘
  */
-require('dotenv').config({ path: require('path').join(__dirname, '..', 'server', '.env') });
 const fs = require('fs');
 const path = require('path');
+
+// dotenv 安裝在 server/node_modules，從這裡載入並讀取 server/.env
+(function loadEnv() {
+  const envPath = path.join(__dirname, '..', 'server', '.env');
+  try {
+    require('dotenv').config({ path: envPath });
+  } catch {
+    try {
+      require(path.join(__dirname, '..', 'server', 'node_modules', 'dotenv')).config({ path: envPath });
+    } catch {
+      console.warn('⚠️  找不到 dotenv，將直接使用環境變數。');
+    }
+  }
+})();
 
 const TOKEN = String(process.env.LINE_CHANNEL_ACCESS_TOKEN || '').trim();
 const LIFF_ID = String(process.env.LINE_LIFF_ID || '').trim();
