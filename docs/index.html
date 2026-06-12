@@ -256,20 +256,30 @@
                             加入 LINE 好友
                         </a>
                     </div>
+                    <!-- 手機版：點小 QR 可放大供另一支手機掃描 -->
+                    <button type="button" class="js-qr-open lg:hidden mt-2 inline-flex items-center gap-3 bg-white/90 backdrop-blur-sm border border-[#06C755]/20 rounded-2xl p-2.5 pr-4 shadow-lg active:scale-[0.98] transition-all" aria-label="放大 LINE QR Code">
+                        <img src="https://cdn.jsdelivr.net/gh/davidping-happy/sweetpotato@main/photo/line-qr.png"
+                             alt="磐石烤地瓜 LINE QR Code" width="64" height="64"
+                             class="w-16 h-16 object-contain rounded-lg" loading="lazy" />
+                        <span class="text-left">
+                            <span class="block text-[#06C755] font-extrabold text-sm">掃碼加 LINE 好友</span>
+                            <span class="block text-secondary/60 text-xs mt-0.5 flex items-center gap-1"><i class="w-3 h-3" data-lucide="maximize-2"></i> 點擊放大掃描</span>
+                        </span>
+                    </button>
                 </div>
             </div>
-            <!-- 桌機版 hero QR 卡片 -->
-            <div class="hidden lg:block absolute right-10 top-1/2 -translate-y-1/2 z-10">
-                <div class="bg-white/95 backdrop-blur-sm p-5 rounded-2xl shadow-2xl border border-[#06C755]/20 text-center">
+            <!-- 桌機版 hero QR 卡片（點擊放大） -->
+            <button type="button" class="js-qr-open hidden lg:block absolute right-10 top-1/2 -translate-y-1/2 z-10 cursor-pointer" aria-label="放大 LINE QR Code">
+                <div class="bg-white/95 backdrop-blur-sm p-5 rounded-2xl shadow-2xl border border-[#06C755]/20 text-center hover:scale-[1.03] transition-transform">
                     <p class="text-[#06C755] font-extrabold text-sm mb-3 flex items-center justify-center gap-1.5">
                         <i class="w-4 h-4" data-lucide="message-circle"></i> 掃碼加 LINE 好友
                     </p>
                     <img src="https://cdn.jsdelivr.net/gh/davidping-happy/sweetpotato@main/photo/line-qr.png"
                          alt="磐石烤地瓜 LINE QR Code" width="160" height="160"
                          class="w-40 h-40 object-contain mx-auto" loading="lazy" />
-                    <p class="text-secondary/60 text-xs mt-2">輸入「菜單」逛商品</p>
+                    <p class="text-secondary/60 text-xs mt-2 flex items-center justify-center gap-1"><i class="w-3 h-3" data-lucide="maximize-2"></i> 點擊放大 · 輸入「菜單」逛商品</p>
                 </div>
-            </div>
+            </button>
         </section>
 
         <!-- Product List Section -->
@@ -499,6 +509,27 @@
     <div id="toast" class="fixed bottom-6 right-6 z-[80] bg-secondary text-white px-6 py-3 rounded-xl shadow-2xl flex items-center gap-3 transform translate-y-20 opacity-0 transition-all duration-300 pointer-events-none">
         <i class="w-5 h-5" data-lucide="check-circle"></i>
         <span id="toast-msg">已加入購物車</span>
+    </div>
+
+    <!-- LINE QR 放大彈窗 -->
+    <div id="qr-modal" class="fixed inset-0 z-[90] hidden items-center justify-center bg-black/70 backdrop-blur-sm p-6">
+        <div class="bg-white rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center relative shadow-2xl">
+            <button id="qr-modal-close" class="absolute top-3 right-3 p-2 rounded-full hover:bg-gray-100 text-secondary/60" aria-label="關閉">
+                <i class="w-5 h-5" data-lucide="x"></i>
+            </button>
+            <p class="text-[#06C755] font-extrabold text-base mb-1 flex items-center justify-center gap-1.5">
+                <i class="w-5 h-5" data-lucide="message-circle"></i> 磐石烤地瓜 LINE
+            </p>
+            <p class="text-secondary/60 text-sm mb-5">用另一支手機 LINE 掃描下方 QR 加好友</p>
+            <img src="https://cdn.jsdelivr.net/gh/davidping-happy/sweetpotato@main/photo/line-qr.png"
+                 alt="磐石烤地瓜 LINE QR Code" width="320" height="320"
+                 class="w-64 h-64 sm:w-72 sm:h-72 object-contain mx-auto bg-white p-2 rounded-2xl border border-outline/10" />
+            <p class="text-secondary/50 text-xs mt-3">@437lnypi · 加好友後輸入「菜單」逛商品</p>
+            <a href="https://line.me/R/ti/p/%40437lnypi" target="_blank" rel="noopener noreferrer"
+               class="mt-5 inline-flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-[#06C755] text-white font-extrabold hover:brightness-110 transition-all no-underline">
+                <i class="w-5 h-5" data-lucide="user-plus"></i> 在這支手機直接加好友
+            </a>
+        </div>
     </div>
 
     <!-- Scripts for UI Interactivity -->
@@ -1322,6 +1353,41 @@
         });
 
         document.addEventListener('click', handleLineBindClick);
+
+        // ============ LINE QR 放大彈窗 ============
+        function openQrModal() {
+            const modal = document.getElementById('qr-modal');
+            if (!modal) return;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeQrModal() {
+            const modal = document.getElementById('qr-modal');
+            if (!modal) return;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            document.body.style.overflow = '';
+        }
+        document.addEventListener('click', (event) => {
+            if (event.target.closest('.js-qr-open')) {
+                event.preventDefault();
+                openQrModal();
+                return;
+            }
+            if (event.target.closest('#qr-modal-close')) {
+                closeQrModal();
+                return;
+            }
+            const modal = document.getElementById('qr-modal');
+            // 點擊彈窗背景（非內容卡片）即關閉
+            if (modal && !modal.classList.contains('hidden') && event.target === modal) {
+                closeQrModal();
+            }
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') closeQrModal();
+        });
 
         // ============ Init ============
         window.AppRuntime.init()
