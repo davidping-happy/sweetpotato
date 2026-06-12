@@ -11,6 +11,7 @@ const productsRouter = require('./routes/products');
 const ordersRouter = require('./routes/orders');
 const adminAuthRouter = require('./routes/adminAuth');
 const lineAuthRouter = require('./routes/lineAuth');
+const lineWebhookRouter = require('./routes/lineWebhook');
 const newsletterRouter = require('./routes/newsletter');
 
 const app = express();
@@ -62,6 +63,10 @@ async function loadFallbackNewsletterSubscribersFromFile() {
 
 // ============ Middleware ============
 app.use(cors());
+
+// LINE webhook 必須在 express.json 之前掛載，以取得原始位元組做簽章驗證
+app.use('/api/line/webhook', express.raw({ type: '*/*' }), lineWebhookRouter);
+
 app.use(express.json({ limit: '10mb' }));
 
 const { getPublicAppConfig } = require('./utils/publicAppConfig');

@@ -28,6 +28,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- LINE LIFF SDK：讓網頁可在 LINE 內建瀏覽器開啟並自動連動使用者身分 -->
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <script id="tailwind-config">
         tailwind.config = {
             darkMode: "class",
@@ -457,7 +459,10 @@
             lineLoginChannelHint: '',
             lineLoginCallbackUrl: '',
             lineCustomerNotifyEnabled: false,
+            lineLiffId: '',
+            lineLiffIdValid: false,
         };
+        let liffReady = false;
 
         function apiUrl(path) {
             return window.AppRuntime.apiUrl(path);
@@ -617,6 +622,8 @@
                 lineLoginChannelHint: String(json.lineLoginChannelHint || '').trim(),
                 lineLoginCallbackUrl: String(json.lineLoginCallbackUrl || '').trim(),
                 lineCustomerNotifyEnabled: Boolean(json.lineCustomerNotifyEnabled),
+                lineLiffId: String(json.lineLiffId || '').trim(),
+                lineLiffIdValid: Boolean(json.lineLiffIdValid),
             };
 
             applyLineBindFromUrl();
@@ -645,6 +652,41 @@
                 syncLineBindLinks();
             } finally {
                 if (typeof lucide !== 'undefined') lucide.createIcons();
+            }
+        }
+
+        // ============ LIFF：在 LINE 內開啟時自動連動使用者身分 ============
+        async function initLiff() {
+            const liffId = (publicConfig.lineLiffId || '').trim();
+            if (!liffId || typeof liff === 'undefined') return;
+
+            try {
+                await liff.init({ liffId });
+                liffReady = true;
+            } catch (err) {
+                console.warn('LIFF init 失敗：', err && err.message);
+                return;
+            }
+
+            // 僅在 LINE App 內建瀏覽器中自動取得身分（外部瀏覽器不強制登入）
+            if (!liff.isInClient()) return;
+
+            try {
+                if (!liff.isLoggedIn()) {
+                    liff.login();
+                    return;
+                }
+                const profile = await liff.getProfile();
+                const userId = (profile && profile.userId || '').trim();
+                if (userId) {
+                    localStorage.setItem(LINE_USER_ID_KEY, userId);
+                    const idField = document.getElementById('cust-line-user-id');
+                    if (idField) idField.value = userId;
+                    updateLineBindUi(true, `已透過 LINE 連動：${profile.displayName || '完成'}`);
+                    document.body.classList.add('in-line-client');
+                }
+            } catch (err) {
+                console.warn('LIFF 取得身分失敗：', err && err.message);
             }
         }
 
@@ -1234,6 +1276,7 @@
                 updateCartUI();
                 loadProducts();
                 loadPublicConfig();
+                initLiff();
             })
             .catch((err) => {
                 showLineBindUnavailable(`無法載入 API 設定：${err.message}`);

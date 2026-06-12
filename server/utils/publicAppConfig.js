@@ -20,8 +20,10 @@ function getPublicApiBaseUrlFromRequest(req) {
 
 function getPublicAppConfig(req) {
   const { getPublicLineConfig } = require('./lineLoginConfig');
+  const { getPublicLiffConfig } = require('./liffConfig');
   return {
     ...getPublicLineConfig(),
+    ...getPublicLiffConfig(),
     apiBaseUrl: getPublicApiBaseUrlFromRequest(req),
   };
 }

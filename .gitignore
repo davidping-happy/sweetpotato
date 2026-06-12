@@ -1,0 +1,9 @@
+# 機密文件（含 token / 密碼），請勿提交
+*.docx
+~$*.docx
+
+# 相依套件
+node_modules/
+
+# 環境變數
+.env
