@@ -961,53 +961,83 @@
                 .replace(/\s+/g, '');
         }
 
+        function escHtml(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        function productImageUrl(product) {
+            if (product && product.imageUrl) return normalizeImagePath(product.imageUrl);
+            // 沒有圖片時，依分類給預設圖
+            const cat = String(product?.category || '');
+            if (cat.includes('蛋')) return `${IMAGE_CDN_BASE}photo/004.png`;
+            if (cat.includes('零食')) return SWEET_POTATO_CANDY_IMAGE;
+            return `${IMAGE_CDN_BASE}photo/002.jpg`;
+        }
+
+        function badgeFor(name) {
+            return /台農57|黃金地瓜/.test(String(name || '')) ? '熱銷首選' : '';
+        }
+
+        function renderProductCard(product) {
+            const id = product._id || '';
+            const name = product.name || '';
+            const price = Number(product.price) || 0;
+            const desc = product.description || '';
+            const img = productImageUrl(product);
+            const inStock = product.inStock !== false;
+            const badge = badgeFor(name);
+
+            const actionHtml = inStock
+                ? `<button class="add-to-cart-btn bg-secondary text-white px-4 py-2 rounded-lg font-bold text-sm flex items-center gap-2 hover:bg-primary transition-colors active:scale-95"
+                        data-product-id="${escHtml(id)}" data-name="${escHtml(name)}" data-price="${price}" data-img="${escHtml(img)}" data-desc="${escHtml(desc)}">
+                        <i class="w-4 h-4" data-lucide="shopping-cart"></i> 加入購物車
+                    </button>`
+                : `<span class="text-sm font-bold text-gray-400 px-2 py-1 rounded-lg bg-gray-100">暫時售完</span>`;
+
+            return `
+                <div class="bg-white rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-shadow border border-outline/10 flex flex-col" data-product-id="${escHtml(id)}">
+                    <div class="relative aspect-[4/5] overflow-hidden">
+                        <img alt="${escHtml(name)}" class="w-full h-full object-cover hover:scale-105 transition-transform duration-500" src="${escHtml(img)}" loading="lazy" />
+                        ${badge ? `<span class="absolute top-4 right-4 bg-primary text-white text-xs font-bold px-3 py-1 rounded-full">${escHtml(badge)}</span>` : ''}
+                    </div>
+                    <div class="p-6 flex flex-col flex-1">
+                        <h4 class="text-xl font-bold text-secondary mb-2">${escHtml(name)}</h4>
+                        <p class="text-secondary/60 text-sm mb-6 flex-1">${escHtml(desc)}</p>
+                        <div class="flex items-center justify-between mt-auto">
+                            <span class="text-2xl font-bold text-primary">NT$${price}</span>
+                            ${actionHtml}
+                        </div>
+                    </div>
+                </div>`;
+        }
+
         async function loadProducts() {
             try {
                 const res = await fetch(apiUrl('/api/products'));
                 const json = await res.json();
-                if (!json.success) return;
+                if (!json.success || !Array.isArray(json.data)) return;
 
-                const grid = document.getElementById('product-grid');
-                // Update existing cards' add-to-cart buttons with productId from DB
                 const products = json.data;
-                const buttons = grid.querySelectorAll('.add-to-cart-btn');
-                products.forEach((product) => {
-                    if (product?.name && product?._id) {
-                        productIdByName[product.name] = product._id;
-                    }
-                    const key = normalizeProductName(product.name);
-                    const btn = Array.from(buttons).find(
-                        (b) => normalizeProductName(b.dataset.name) === key,
-                    );
-                    if (!btn) return;
+                const grid = document.getElementById('product-grid');
 
-                    btn.dataset.productId = product._id;
-                    btn.dataset.name = product.name;
-                    btn.dataset.price = product.price;
-                    const card = btn.closest('[data-product-id]');
-                    const imageUrl = key.includes('地瓜糖')
-                        ? SWEET_POTATO_CANDY_IMAGE
-                        : (product.imageUrl ? normalizeImagePath(product.imageUrl) : '');
-                    if (imageUrl) {
-                        btn.dataset.img = imageUrl;
-                        const cardImg = card?.querySelector('img');
-                        if (cardImg) cardImg.src = imageUrl;
-                    }
-                    // 同步卡片上顯示的價格與描述（讓後台改價即時反映於網頁）
-                    if (card) {
-                        const priceEl = card.querySelector('.text-2xl.font-bold.text-primary');
-                        if (priceEl && Number.isFinite(Number(product.price))) {
-                            priceEl.textContent = 'NT$' + Number(product.price);
-                        }
-                        if (typeof product.description === 'string' && product.description.trim()) {
-                            const descEl = card.querySelector('p');
-                            if (descEl) descEl.textContent = product.description;
-                        }
-                    }
+                // 建立 名稱→productId 對照（給購物車補 productId 用）
+                products.forEach((p) => {
+                    if (p?.name && p?._id) productIdByName[p.name] = p._id;
                 });
-                console.log(`✅ 已從 API 載入 ${products.length} 筆商品`);
+
+                // 完全動態渲染：依後端資料重建整個商品區（新增 / 刪除都會反映）
+                if (products.length > 0) {
+                    grid.innerHTML = products.map(renderProductCard).join('');
+                } else {
+                    grid.innerHTML = '<p class="col-span-full text-center text-secondary/60 py-12">商品準備中，敬請期待 🍠</p>';
+                }
+                if (window.lucide) lucide.createIcons();
+                console.log(`✅ 已從 API 動態載入 ${products.length} 筆商品`);
             } catch (err) {
-                console.log('ℹ️ API 未啟動，使用前端靜態資料模式');
+                // API 連線失敗：保留 HTML 既有的靜態卡片作為備援
+                console.log('ℹ️ API 未啟動，沿用網頁靜態商品');
             }
         }
 
@@ -1076,24 +1106,25 @@
             }));
         }
 
-        // ============ Add to Cart ============
-        document.querySelectorAll('.add-to-cart-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const name = btn.dataset.name;
-                const price = parseInt(btn.dataset.price);
-                const img = btn.dataset.img;
-                const desc = btn.dataset.desc;
-                const productId = btn.dataset.productId || null;
+        // ============ Add to Cart（事件委派，支援動態渲染的商品卡片） ============
+        document.addEventListener('click', (event) => {
+            const btn = event.target.closest('.add-to-cart-btn');
+            if (!btn) return;
 
-                const existing = cart.find(item => item.name === name);
-                if (existing) {
-                    existing.qty++;
-                } else {
-                    cart.push({ productId, name, price, img, desc, qty: 1 });
-                }
-                updateCartUI();
-                showToast(`已將「${name}」加入購物車`);
-            });
+            const name = btn.dataset.name;
+            const price = parseInt(btn.dataset.price);
+            const img = btn.dataset.img;
+            const desc = btn.dataset.desc;
+            const productId = btn.dataset.productId || null;
+
+            const existing = cart.find(item => item.name === name);
+            if (existing) {
+                existing.qty++;
+            } else {
+                cart.push({ productId, name, price, img, desc, qty: 1 });
+            }
+            updateCartUI();
+            showToast(`已將「${name}」加入購物車`);
         });
 
         // ============ Toast ============
