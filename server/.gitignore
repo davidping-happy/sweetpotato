@@ -4,3 +4,5 @@ data/orders.json
 data/newsletter-subscribers.json
 data/admin-auth.json
 data/line-oauth-states.json
+data/products.json
+data/site-settings.json

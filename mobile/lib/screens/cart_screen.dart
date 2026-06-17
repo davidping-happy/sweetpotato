@@ -2,7 +2,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
-import '../config/app_config.dart';
 import '../models/cart_item.dart';
 import '../state/cart_provider.dart';
 import '../theme/app_theme.dart';
@@ -274,7 +273,9 @@ class _CartSummaryBar extends StatelessWidget {
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    '黃金地瓜滿 ${AppConfig.freeShippingSweetPotatoQty} 盒享免運優惠',
+                    cart.shippingRule.freeThresholdKeyword.isEmpty
+                        ? '滿 ${cart.freeShippingThresholdQty} 件享免運優惠'
+                        : '${cart.shippingRule.freeThresholdKeyword}滿 ${cart.freeShippingThresholdQty} 盒享免運優惠',
                     style: const TextStyle(
                         color: AppTheme.clay, fontSize: 12),
                   ),

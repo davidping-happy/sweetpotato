@@ -462,7 +462,7 @@
                              alt="磐石烤地瓜 LINE 官方帳號 QR Code" width="200" height="200"
                              class="w-44 h-44 md:w-52 md:h-52 object-contain" loading="lazy" />
                     </div>
-                    <p class="text-secondary/60 text-xs mt-3">用 LINE 掃描加入好友 · @437lnypi</p>
+                    <p class="text-secondary/60 text-xs mt-3">用 LINE 掃描加入好友 · <span data-line-id>@437lnypi</span></p>
                 </div>
             </div>
         </section>
@@ -486,11 +486,11 @@
                 <div class="space-y-4">
                     <h5 class="font-bold text-secondary">聯絡我們</h5>
                     <ul class="space-y-2 text-secondary/70 text-sm">
-                        <li class="flex items-center gap-2"><i class="w-4 h-4" data-lucide="phone"></i> 0953830409</li>
-                        <li class="flex items-center gap-2"><i class="w-4 h-4" data-lucide="mail"></i> sweetpotatograndmom@gmail.com</li>
+                        <li class="flex items-center gap-2"><i class="w-4 h-4" data-lucide="phone"></i> <span data-shop-phone>0953830409</span></li>
+                        <li class="flex items-center gap-2"><i class="w-4 h-4" data-lucide="mail"></i> <span data-shop-email>sweetpotatograndmom@gmail.com</span></li>
                         <li class="flex items-center gap-2 text-balance">
                             <i class="w-4 h-4" data-lucide="map-pin"></i>
-                            <a class="hover:text-primary transition-colors" href="https://www.google.com/maps/search/?api=1&amp;query=%E9%AB%98%E9%9B%84%E5%B8%82%E5%B7%A6%E7%87%9F%E5%8D%80%E8%8F%AF%E5%A4%8F%E8%B7%AF576%E8%99%9F" target="_blank" rel="noopener noreferrer">高雄市左營區華夏路576號</a>
+                            <a class="hover:text-primary transition-colors" data-shop-address-link href="https://www.google.com/maps/search/?api=1&amp;query=%E9%AB%98%E9%9B%84%E5%B8%82%E5%B7%A6%E7%87%9F%E5%8D%80%E8%8F%AF%E5%A4%8F%E8%B7%AF576%E8%99%9F" target="_blank" rel="noopener noreferrer"><span data-shop-address>高雄市左營區華夏路576號</span></a>
                         </li>
                     </ul>
                 </div>
@@ -524,7 +524,7 @@
             <img src="https://cdn.jsdelivr.net/gh/davidping-happy/sweetpotato@main/photo/line-qr.png"
                  alt="磐石烤地瓜 LINE QR Code" width="320" height="320"
                  class="w-64 h-64 sm:w-72 sm:h-72 object-contain mx-auto bg-white p-2 rounded-2xl border border-outline/10" />
-            <p class="text-secondary/50 text-xs mt-3">@437lnypi · 加好友後輸入「菜單」逛商品</p>
+            <p class="text-secondary/50 text-xs mt-3"><span data-line-id>@437lnypi</span> · 加好友後輸入「菜單」逛商品</p>
             <a href="https://line.me/R/ti/p/%40437lnypi" target="_blank" rel="noopener noreferrer"
                class="mt-5 inline-flex items-center justify-center gap-2 w-full py-3.5 rounded-xl bg-[#06C755] text-white font-extrabold hover:brightness-110 transition-all no-underline">
                 <i class="w-5 h-5" data-lucide="user-plus"></i> 在這支手機直接加好友
@@ -838,11 +838,17 @@
         let cart = [];      // { productId, name, price, img, desc, qty }
         let checkoutStep = 0; // 0 = cart view, 1 = form visible, 2 = confirm
 
+        // 運費規則（預設值與後端一致；loadSiteSettings() 會以後台設定覆蓋）
+        let shippingRule = { fee: 150, freeThresholdQty: 20, freeThresholdKeyword: '黃金地瓜' };
+
         function calculateShippingByCart() {
-            const sweetPotatoQty = cart
-                .filter(item => (item.name || '').includes('黃金地瓜'))
+            const threshold = Number(shippingRule.freeThresholdQty) || 0;
+            if (threshold <= 0) return 0;
+            const keyword = shippingRule.freeThresholdKeyword || '';
+            const qualifyingQty = cart
+                .filter(item => keyword === '' || (item.name || '').includes(keyword))
                 .reduce((sum, item) => sum + Number(item.qty || 0), 0);
-            return sweetPotatoQty >= 20 ? 0 : 150;
+            return qualifyingQty >= threshold ? 0 : (Number(shippingRule.fee) || 0);
         }
 
         function updateCartUI() {
@@ -978,18 +984,85 @@
                     btn.dataset.productId = product._id;
                     btn.dataset.name = product.name;
                     btn.dataset.price = product.price;
+                    const card = btn.closest('[data-product-id]');
                     const imageUrl = key.includes('地瓜糖')
                         ? SWEET_POTATO_CANDY_IMAGE
                         : (product.imageUrl ? normalizeImagePath(product.imageUrl) : '');
                     if (imageUrl) {
                         btn.dataset.img = imageUrl;
-                        const cardImg = btn.closest('[data-product-id]')?.querySelector('img');
+                        const cardImg = card?.querySelector('img');
                         if (cardImg) cardImg.src = imageUrl;
+                    }
+                    // 同步卡片上顯示的價格與描述（讓後台改價即時反映於網頁）
+                    if (card) {
+                        const priceEl = card.querySelector('.text-2xl.font-bold.text-primary');
+                        if (priceEl && Number.isFinite(Number(product.price))) {
+                            priceEl.textContent = 'NT$' + Number(product.price);
+                        }
+                        if (typeof product.description === 'string' && product.description.trim()) {
+                            const descEl = card.querySelector('p');
+                            if (descEl) descEl.textContent = product.description;
+                        }
                     }
                 });
                 console.log(`✅ 已從 API 載入 ${products.length} 筆商品`);
             } catch (err) {
                 console.log('ℹ️ API 未啟動，使用前端靜態資料模式');
+            }
+        }
+
+        // ============ 載入店家設定（聯絡方式 / LINE / 運費），與 App 共用同一來源 ============
+        async function loadSiteSettings() {
+            try {
+                const res = await fetch(apiUrl('/api/site-settings'));
+                const json = await res.json();
+                if (!json.success || !json.data) return;
+                const d = json.data;
+
+                if (d.shipping) {
+                    shippingRule = {
+                        fee: Number(d.shipping.fee) || 0,
+                        freeThresholdQty: Number(d.shipping.freeThresholdQty) || 0,
+                        freeThresholdKeyword: (d.shipping.freeThresholdKeyword ?? '').toString(),
+                    };
+                    const hint = document.getElementById('cart-free-shipping-hint');
+                    if (hint) {
+                        hint.textContent = shippingRule.freeThresholdKeyword
+                            ? `${shippingRule.freeThresholdKeyword}滿 ${shippingRule.freeThresholdQty} 盒享免運優惠`
+                            : `滿 ${shippingRule.freeThresholdQty} 件享免運優惠`;
+                    }
+                    updateCartUI();
+                }
+
+                if (d.shop) {
+                    const setText = (sel, val) => {
+                        if (!val) return;
+                        document.querySelectorAll(sel).forEach((el) => { el.textContent = val; });
+                    };
+                    setText('[data-shop-phone]', d.shop.phone);
+                    setText('[data-shop-email]', d.shop.email);
+                    setText('[data-shop-address]', d.shop.address);
+                    if (d.shop.address) {
+                        document.querySelectorAll('[data-shop-address-link]').forEach((a) => {
+                            a.href = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(d.shop.address)}`;
+                        });
+                    }
+                }
+
+                if (d.line) {
+                    if (d.line.addFriendUrl) {
+                        document.querySelectorAll('a[href*="line.me/R/ti/p"]').forEach((a) => {
+                            a.href = d.line.addFriendUrl;
+                        });
+                    }
+                    if (d.line.officialId) {
+                        document.querySelectorAll('[data-line-id]').forEach((el) => {
+                            el.textContent = d.line.officialId;
+                        });
+                    }
+                }
+            } catch (err) {
+                console.log('ℹ️ 店家設定載入失敗，沿用網頁預設值');
             }
         }
 
@@ -1398,6 +1471,7 @@
                 setFullLineBindLabel('cart-footer-line-bind-label', '綁定 LINE 通知');
                 updateCartUI();
                 loadProducts();
+                loadSiteSettings();
                 loadPublicConfig();
                 initLiff();
             })

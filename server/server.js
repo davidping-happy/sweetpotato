@@ -13,6 +13,8 @@ const adminAuthRouter = require('./routes/adminAuth');
 const lineAuthRouter = require('./routes/lineAuth');
 const lineWebhookRouter = require('./routes/lineWebhook');
 const newsletterRouter = require('./routes/newsletter');
+const siteSettingsRouter = require('./routes/siteSettings');
+const { loadFallbackProductsFromFile } = require('./utils/productPersistence');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -90,6 +92,7 @@ app.use('/api/admin', adminAuthRouter);
 app.use('/api/line', lineAuthRouter);
 app.use('/api/orders', ordersRouter);
 app.use('/api/newsletter', newsletterRouter);
+app.use('/api/site-settings', siteSettingsRouter);
 
 // ============ 健康檢查 ============
 app.get('/api/health', (req, res) => {
@@ -129,6 +132,15 @@ async function startServer() {
   try {
     const dbReady = await connectMongo();
     app.locals.db.ready = dbReady;
+
+    // fallback 模式：若已有後台編輯過的商品檔，載入它（覆蓋 seed 預設）
+    if (!dbReady) {
+      const savedProducts = await loadFallbackProductsFromFile();
+      if (savedProducts && savedProducts.length > 0) {
+        app.locals.db.fallbackProducts = savedProducts;
+        console.log(`🛍️  已載入後台編輯的 ${savedProducts.length} 筆商品（data/products.json）`);
+      }
+    }
 
     // 一律載入 fallback 訂單檔（Mongo 模式也會備份；無 Mongo 時為主要儲存）
     const loadedOrders = await syncFallbackOrders(app);

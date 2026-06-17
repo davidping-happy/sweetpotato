@@ -20,11 +20,38 @@ App 直接呼叫既有 API：
 | 功能 | 後端 API | 方法 |
 |---|---|---|
 | 商品列表 / 詳情 | `/api/products`、`/api/products/:id` | GET |
+| 店家設定（聯絡 / LINE / 運費 / 文案） | `/api/site-settings` | GET |
 | 送出訂單 | `/api/orders` | POST |
 | 電子報訂閱 | `/api/newsletter/subscribe` | POST |
-| 加 LINE 好友 | LINE 官方帳號連結（App 內開啟） | — |
+| 加 LINE 好友 | 連結來自 `/api/site-settings`，App 內開啟 | — |
 
-運費規則與後端一致：黃金地瓜滿 20 盒免運，否則 NT$150（金額仍以後端為準重新計算驗證）。
+運費規則由後端設定動態決定（預設：黃金地瓜滿 20 盒免運，否則 NT$150），金額仍以後端為準重新計算驗證。
+
+---
+
+## 內容同步機制（網頁更新 → App / 網站自動同步）
+
+店家不需要改程式或重新打包 App，即可更新內容：
+
+```
+店家在後台網頁編輯  →  後端集中儲存  →  App 開啟時讀取 / 網站載入時讀取
+docs/admin.html         /api/products             SiteSettings + 商品 API
+（登入後）              /api/site-settings
+```
+
+| 可更新項目 | 在哪裡編輯 | App 同步 | 網站同步 |
+|---|---|---|---|
+| 商品：名稱 / 價格 / 描述 / 圖片 / 庫存 / 新增 / 刪除 | 後台「商品管理」分頁 | ✅ 每次開啟自動讀取 | ✅ 既有卡片價格 / 圖片 / 描述會更新 |
+| 聯絡方式（電話 / Email / 地址） | 後台「店家資訊」分頁 | ✅ | ✅ |
+| LINE 官方帳號 ID / 加好友連結 | 後台「店家資訊」分頁 | ✅ | ✅ |
+| 運費規則（運費 / 免運門檻 / 關鍵字） | 後台「店家資訊」分頁 | ✅ | ✅ |
+| 首頁文案（Hero / 品牌故事） | 後台「店家資訊」分頁 | ✅ | （沿用網頁既有設計文案） |
+
+**圖片更新方式**：在後台「商品管理」填入「公開圖片網址」（例如沿用 GitHub `photo/` 資料夾，或任何圖床的圖片連結）。
+
+**App 端實作**：啟動時 `SettingsProvider.load()` 抓取 `/api/site-settings`，套用到聯絡資訊、LINE、運費（`CartProvider`）與文案；抓取失敗時自動使用 `SiteSettings.defaults`（= 原本寫死的值），確保離線也能正常顯示。
+
+> 注意：後端若以 JSON 檔 fallback 模式運行（未連 MongoDB），在 Render 免費方案上檔案可能於重啟後消失。長期保存建議改用 MongoDB Atlas（見 `docs/setup-mongodb-atlas.html`）。
 
 ---
 
@@ -32,10 +59,11 @@ App 直接呼叫既有 API：
 
 ```
 mobile/lib/
-├── config/app_config.dart      # API 網址、CDN、店家資訊、運費規則
-├── models/                     # Product / CartItem / CustomerInfo / OrderResult
-├── services/api_service.dart   # 與後端溝通的服務層
-├── state/cart_provider.dart    # 購物車狀態（Provider / ChangeNotifier）
+├── config/app_config.dart      # API 網址、CDN（店家資訊改由後端動態提供）
+├── models/                     # Product / CartItem / CustomerInfo / OrderResult / SiteSettings
+├── services/api_service.dart   # 與後端溝通的服務層（含 fetchSiteSettings）
+├── state/cart_provider.dart    # 購物車狀態（運費規則可由設定動態套用）
+├── state/settings_provider.dart # 店家設定狀態（啟動時抓取，失敗用內建預設）
 ├── theme/app_theme.dart        # 品牌主題（暖色大地色系）
 ├── widgets/product_card.dart   # 商品卡片
 ├── screens/

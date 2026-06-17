@@ -40,15 +40,20 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>訂單後台</h1>
-    <p class="muted" style="margin:-8px 0 16px;font-size:13px;">
+    <h1>管理後台</h1>
+    <div class="row" style="margin-bottom:16px;">
+      <button class="tab-btn" data-tab="orders">訂單管理</button>
+      <button class="tab-btn secondary" data-tab="products">商品管理</button>
+      <button class="tab-btn secondary" data-tab="settings">店家資訊</button>
+    </div>
+    <p class="muted" id="ordersDeployHint" style="margin:-8px 0 16px;font-size:13px;">
       訂單永久保存：建議
       <a href="./DEPLOY_VPS.md">VPS 部署（orders.json）</a>
       或
       <a href="./setup-mongodb-atlas.html">MongoDB Atlas</a>
     </p>
 
-    <div class="card">
+    <div class="card section" id="section-orders">
       <div class="row">
         <button id="reloadBtn">重新載入訂單</button>
         <button id="logoutBtn" class="secondary">登出</button>
@@ -97,6 +102,82 @@
           <tr><td colspan="11" class="muted">載入中...</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <div class="card section" id="section-products" style="display:none;">
+      <h2 style="margin-top:0;color:#5d4037;">商品管理</h2>
+      <p class="muted">商品的名稱、價格、圖片、描述、庫存改了之後，App 與網站會自動同步。圖片請填「公開圖片網址」（例如你 GitHub 的 photo 資料夾，或任何圖床的圖片連結）。</p>
+      <div class="row">
+        <button id="reloadProductsBtn">重新載入商品</button>
+        <span id="productStatus" class="muted"></span>
+      </div>
+
+      <h3 style="color:#5d4037;">新增商品</h3>
+      <div class="row">
+        <input id="np_name" placeholder="名稱" />
+        <input id="np_price" type="number" placeholder="價格" style="width:100px;" />
+        <select id="np_category"><option>烤地瓜</option><option>零食</option><option>蛋</option></select>
+        <label class="muted"><input id="np_stock" type="checkbox" checked /> 有庫存</label>
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <input id="np_image" placeholder="圖片網址（https://...）" style="min-width:280px;flex:1;" />
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <input id="np_desc" placeholder="商品描述" style="min-width:280px;flex:1;" />
+        <button id="addProductBtn">新增商品</button>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>圖片</th><th>名稱</th><th>價格</th><th>分類</th>
+            <th>圖片網址</th><th>描述</th><th>庫存</th><th>操作</th>
+          </tr>
+        </thead>
+        <tbody id="productsBody"><tr><td colspan="8" class="muted">載入中...</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="card section" id="section-settings" style="display:none;">
+      <h2 style="margin-top:0;color:#5d4037;">店家資訊</h2>
+      <p class="muted">這裡的資料會同步到 App 與網站（聯絡方式、LINE、運費規則、首頁文案）。</p>
+      <span id="settingsStatus" class="muted"></span>
+
+      <h3 style="color:#5d4037;">聯絡資訊</h3>
+      <div class="detail-grid">
+        <label>店名<br><input id="s_shop_name" style="width:100%;" /></label>
+        <label>電話<br><input id="s_shop_phone" style="width:100%;" /></label>
+        <label>Email<br><input id="s_shop_email" style="width:100%;" /></label>
+        <label>地址<br><input id="s_shop_address" style="width:100%;" /></label>
+      </div>
+
+      <h3 style="color:#5d4037;">LINE</h3>
+      <div class="detail-grid">
+        <label>官方帳號 ID（例如 @437lnypi）<br><input id="s_line_id" style="width:100%;" /></label>
+        <label>加好友連結<br><input id="s_line_url" style="width:100%;" /></label>
+      </div>
+
+      <h3 style="color:#5d4037;">運費規則</h3>
+      <div class="detail-grid">
+        <label>運費（NT$）<br><input id="s_ship_fee" type="number" style="width:100%;" /></label>
+        <label>免運門檻數量<br><input id="s_ship_qty" type="number" style="width:100%;" /></label>
+        <label>免運計算的商品關鍵字<br><input id="s_ship_kw" style="width:100%;" /></label>
+      </div>
+      <p class="muted">說明：購物車中「名稱包含關鍵字」的商品數量達到門檻即免運。門檻填 0 = 全站免運。</p>
+
+      <h3 style="color:#5d4037;">首頁文案</h3>
+      <div class="detail-grid">
+        <label>Hero 標籤<br><input id="s_hero_tag" style="width:100%;" /></label>
+        <label>Hero 主標<br><input id="s_hero_title" style="width:100%;" /></label>
+        <label>Hero 副標<br><input id="s_hero_sub" style="width:100%;" /></label>
+        <label>故事標題<br><input id="s_story_title" style="width:100%;" /></label>
+      </div>
+      <label style="display:block;margin-top:8px;">故事內容<br>
+        <textarea id="s_story_body" rows="4" style="width:100%;padding:10px;border-radius:8px;border:1px solid #ddd;font-size:14px;"></textarea>
+      </label>
+      <div class="row" style="margin-top:12px;">
+        <button id="saveSettingsBtn">儲存店家資訊</button>
+      </div>
     </div>
   </div>
 
@@ -489,6 +570,205 @@
       const auth = await window.AdminAuth.requireAdminSession({ loginPath: './admin-login.html' });
       if (!auth?.token) return;
       loadOrders();
+    })();
+  </script>
+
+  <script>
+    // ====== 商品管理 / 店家資訊 ======
+    (function () {
+      const $ = (id) => document.getElementById(id);
+      const aUrl = (p) => window.AppRuntime.apiUrl(p);
+      async function authH() {
+        const h = await window.AdminAuth.getAuthHeaders();
+        if (!h?.Authorization) {
+          window.location.replace('./admin-login.html?reason=unauthorized');
+          throw new Error('未登入或登入已過期');
+        }
+        return h;
+      }
+      const CATS = ['烤地瓜', '零食', '蛋'];
+      const esc = (s) => String(s == null ? '' : s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+      const catOptions = (sel) => CATS.map((c) => `<option ${c === sel ? 'selected' : ''}>${c}</option>`).join('');
+
+      // ---- Tabs ----
+      function showTab(tab) {
+        document.querySelectorAll('.section').forEach((s) => { s.style.display = 'none'; });
+        const el = $('section-' + tab);
+        if (el) el.style.display = '';
+        document.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('secondary', b.dataset.tab !== tab));
+        if (tab === 'products') loadProducts();
+        if (tab === 'settings') loadSettings();
+      }
+      document.querySelectorAll('.tab-btn').forEach((b) => b.addEventListener('click', () => showTab(b.dataset.tab)));
+
+      // ---- Products ----
+      function pStatus(msg, cls) { const e = $('productStatus'); e.className = cls || 'muted'; e.textContent = msg; }
+
+      async function loadProducts() {
+        pStatus('載入中...');
+        try {
+          const res = await fetch(aUrl('/api/products'));
+          const json = await res.json();
+          const list = json.data || [];
+          $('productsBody').innerHTML = list.map((p) => `
+            <tr data-id="${esc(p._id)}">
+              <td><img src="${esc(p.imageUrl)}" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:6px;background:#eee;" onerror="this.style.visibility='hidden'"/></td>
+              <td><input value="${esc(p.name)}" data-f="name" style="width:130px;"/></td>
+              <td><input type="number" value="${Number(p.price) || 0}" data-f="price" style="width:80px;"/></td>
+              <td><select data-f="category">${catOptions(p.category)}</select></td>
+              <td><input value="${esc(p.imageUrl)}" data-f="imageUrl" style="width:200px;"/></td>
+              <td><input value="${esc(p.description)}" data-f="description" style="width:200px;"/></td>
+              <td style="text-align:center;"><input type="checkbox" data-f="inStock" ${p.inStock ? 'checked' : ''}/></td>
+              <td><div class="row"><button data-act="save" data-id="${esc(p._id)}">儲存</button><button class="secondary" data-act="del" data-id="${esc(p._id)}">刪除</button></div></td>
+            </tr>`).join('') || '<tr><td colspan="8" class="muted">尚無商品</td></tr>';
+          pStatus(`共 ${list.length} 筆商品`, 'ok');
+        } catch (err) {
+          pStatus('載入失敗：' + err.message, 'err');
+        }
+      }
+
+      function rowData(id) {
+        const tr = document.querySelector(`#productsBody tr[data-id="${CSS.escape(id)}"]`);
+        const get = (f) => tr.querySelector(`[data-f="${f}"]`);
+        return {
+          name: get('name').value.trim(),
+          price: Number(get('price').value),
+          category: get('category').value,
+          imageUrl: get('imageUrl').value.trim(),
+          description: get('description').value,
+          inStock: get('inStock').checked,
+        };
+      }
+
+      async function saveProduct(id) {
+        pStatus('儲存中...');
+        try {
+          const res = await fetch(aUrl('/api/products/' + encodeURIComponent(id)), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', ...(await authH()) },
+            body: JSON.stringify(rowData(id)),
+          });
+          const json = await res.json();
+          if (!res.ok || !json.success) throw new Error(json.message || '儲存失敗');
+          pStatus('✅ 已儲存', 'ok');
+          loadProducts();
+        } catch (err) {
+          pStatus('儲存失敗：' + err.message, 'err');
+        }
+      }
+
+      async function deleteProduct(id) {
+        if (!window.confirm('確定要刪除此商品嗎？')) return;
+        try {
+          const res = await fetch(aUrl('/api/products/' + encodeURIComponent(id)), {
+            method: 'DELETE', headers: await authH(),
+          });
+          const json = await res.json();
+          if (!res.ok || !json.success) throw new Error(json.message || '刪除失敗');
+          pStatus('✅ 已刪除', 'ok');
+          loadProducts();
+        } catch (err) {
+          pStatus('刪除失敗：' + err.message, 'err');
+        }
+      }
+
+      $('productsBody').addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-act]');
+        if (!btn) return;
+        if (btn.dataset.act === 'save') saveProduct(btn.dataset.id);
+        else if (btn.dataset.act === 'del') deleteProduct(btn.dataset.id);
+      });
+
+      $('addProductBtn').addEventListener('click', async () => {
+        const body = {
+          name: $('np_name').value.trim(),
+          price: Number($('np_price').value),
+          category: $('np_category').value,
+          imageUrl: $('np_image').value.trim(),
+          description: $('np_desc').value,
+          inStock: $('np_stock').checked,
+        };
+        if (!body.name) { pStatus('請輸入商品名稱', 'err'); return; }
+        pStatus('新增中...');
+        try {
+          const res = await fetch(aUrl('/api/products'), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...(await authH()) },
+            body: JSON.stringify(body),
+          });
+          const json = await res.json();
+          if (!res.ok || !json.success) throw new Error(json.message || '新增失敗');
+          $('np_name').value = ''; $('np_price').value = ''; $('np_image').value = ''; $('np_desc').value = '';
+          pStatus('✅ 已新增', 'ok');
+          loadProducts();
+        } catch (err) {
+          pStatus('新增失敗：' + err.message, 'err');
+        }
+      });
+      $('reloadProductsBtn').addEventListener('click', loadProducts);
+
+      // ---- Settings ----
+      function sStatus(msg, cls) { const e = $('settingsStatus'); e.className = cls || 'muted'; e.textContent = msg; }
+
+      async function loadSettings() {
+        sStatus('載入中...');
+        try {
+          const res = await fetch(aUrl('/api/site-settings'));
+          const json = await res.json();
+          const d = json.data || {};
+          $('s_shop_name').value = d.shop?.name || '';
+          $('s_shop_phone').value = d.shop?.phone || '';
+          $('s_shop_email').value = d.shop?.email || '';
+          $('s_shop_address').value = d.shop?.address || '';
+          $('s_line_id').value = d.line?.officialId || '';
+          $('s_line_url').value = d.line?.addFriendUrl || '';
+          $('s_ship_fee').value = d.shipping?.fee ?? 150;
+          $('s_ship_qty').value = d.shipping?.freeThresholdQty ?? 20;
+          $('s_ship_kw').value = d.shipping?.freeThresholdKeyword || '';
+          $('s_hero_tag').value = d.content?.heroTag || '';
+          $('s_hero_title').value = d.content?.heroTitle || '';
+          $('s_hero_sub').value = d.content?.heroSubtitle || '';
+          $('s_story_title').value = d.content?.storyTitle || '';
+          $('s_story_body').value = d.content?.storyBody || '';
+          sStatus('已載入目前設定', 'ok');
+        } catch (err) {
+          sStatus('載入失敗：' + err.message, 'err');
+        }
+      }
+
+      $('saveSettingsBtn').addEventListener('click', async () => {
+        const body = {
+          shop: {
+            name: $('s_shop_name').value, phone: $('s_shop_phone').value,
+            email: $('s_shop_email').value, address: $('s_shop_address').value,
+          },
+          line: { officialId: $('s_line_id').value, addFriendUrl: $('s_line_url').value },
+          shipping: {
+            fee: Number($('s_ship_fee').value),
+            freeThresholdQty: Number($('s_ship_qty').value),
+            freeThresholdKeyword: $('s_ship_kw').value,
+          },
+          content: {
+            heroTag: $('s_hero_tag').value, heroTitle: $('s_hero_title').value,
+            heroSubtitle: $('s_hero_sub').value, storyTitle: $('s_story_title').value,
+            storyBody: $('s_story_body').value,
+          },
+        };
+        sStatus('儲存中...');
+        try {
+          const res = await fetch(aUrl('/api/site-settings'), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', ...(await authH()) },
+            body: JSON.stringify(body),
+          });
+          const json = await res.json();
+          if (!res.ok || !json.success) throw new Error(json.message || '儲存失敗');
+          sStatus('✅ 已儲存，App 與網站會在下次開啟時同步', 'ok');
+        } catch (err) {
+          sStatus('儲存失敗：' + err.message, 'err');
+        }
+      });
     })();
   </script>
 </body>

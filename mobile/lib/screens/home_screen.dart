@@ -7,6 +7,7 @@ import '../config/app_config.dart';
 import '../models/product.dart';
 import '../services/api_service.dart';
 import '../state/cart_provider.dart';
+import '../state/settings_provider.dart';
 import '../theme/app_theme.dart';
 import '../widgets/product_card.dart';
 import 'product_detail_screen.dart';
@@ -138,7 +139,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 snapshot.connectionState == ConnectionState.waiting;
             return CustomScrollView(
               slivers: [
-                const _HeroSliverAppBar(),
+                _HeroSliverAppBar(),
                 const SliverToBoxAdapter(child: _SectionHeader(
                   label: 'Our Selection',
                   title: '阿嬤的手工精選',
@@ -156,12 +157,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     onAdd: _addToCart,
                     onTap: _openDetail,
                   ),
-                const SliverToBoxAdapter(child: _BrandStory()),
+                SliverToBoxAdapter(child: _BrandStory()),
                 SliverToBoxAdapter(
                   child: _NewsletterSection(),
                 ),
-                const SliverToBoxAdapter(child: _LineSection()),
-                const SliverToBoxAdapter(child: _ContactFooter()),
+                SliverToBoxAdapter(child: _LineSection()),
+                SliverToBoxAdapter(child: _ContactFooter()),
               ],
             );
           },
@@ -172,10 +173,10 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class _HeroSliverAppBar extends StatelessWidget {
-  const _HeroSliverAppBar();
-
   @override
   Widget build(BuildContext context) {
+    final settings = context.watch<SettingsProvider>().settings;
+    final content = settings.content;
     return SliverAppBar(
       expandedHeight: 320,
       pinned: true,
@@ -217,9 +218,9 @@ class _HeroSliverAppBar extends StatelessWidget {
                       color: AppTheme.honey.withValues(alpha: 0.9),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Text(
-                      '傳承古早窯烤工藝',
-                      style: TextStyle(
+                    child: Text(
+                      content.heroTag,
+                      style: const TextStyle(
                         color: AppTheme.charcoal,
                         fontWeight: FontWeight.w700,
                         fontSize: 12,
@@ -227,9 +228,9 @@ class _HeroSliverAppBar extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
-                    '番薯阿嬤的\n溫暖滋味',
-                    style: TextStyle(
+                  Text(
+                    content.heroTitle,
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 30,
                       height: 1.2,
@@ -238,7 +239,7 @@ class _HeroSliverAppBar extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    '炭火慢烤，每一口都是古早的人情味。',
+                    content.heroSubtitle,
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.9),
                       fontSize: 14,
@@ -333,10 +334,9 @@ class _ProductSliverGrid extends StatelessWidget {
 }
 
 class _BrandStory extends StatelessWidget {
-  const _BrandStory();
-
   @override
   Widget build(BuildContext context) {
+    final content = context.watch<SettingsProvider>().settings.content;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 24, 16, 8),
       padding: const EdgeInsets.all(20),
@@ -370,9 +370,9 @@ class _BrandStory extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
-            '守護一爐炭火的執著',
-            style: TextStyle(
+          Text(
+            content.storyTitle,
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 22,
               fontWeight: FontWeight.w800,
@@ -380,7 +380,7 @@ class _BrandStory extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            '在那座用了 20 多年的窯烤爐旁，我們依然堅持最古老的做法。阿嬤常說：「地瓜要好吃，急不得。」每一顆地瓜都承載著我們對土地的敬意。',
+            content.storyBody,
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.85),
               height: 1.6,
@@ -538,11 +538,10 @@ class _NewsletterSectionState extends State<_NewsletterSection> {
 }
 
 class _LineSection extends StatelessWidget {
-  const _LineSection();
-
-  Future<void> _openLine(BuildContext context) async {
+  Future<void> _openLine(BuildContext context, String addFriendUrl,
+      String officialId) async {
     final messenger = ScaffoldMessenger.of(context);
-    final uri = Uri.parse(AppConfig.lineAddFriendUrl);
+    final uri = Uri.parse(addFriendUrl);
 
     // 不使用 canLaunchUrl（在 Android 受套件可見性限制常誤回 false），
     // 直接嘗試開啟，並提供退路。
@@ -560,13 +559,14 @@ class _LineSection extends StatelessWidget {
     messenger
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(
-        content: Text('無法自動開啟 LINE，請在 LINE 搜尋好友 ID：${AppConfig.lineOfficialId}'),
+        content: Text('無法自動開啟 LINE，請在 LINE 搜尋好友 ID：$officialId'),
         duration: const Duration(seconds: 4),
       ));
   }
 
   @override
   Widget build(BuildContext context) {
+    final line = context.watch<SettingsProvider>().settings.line;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       padding: const EdgeInsets.all(20),
@@ -587,14 +587,15 @@ class _LineSection extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '加入「磐石烤地瓜」LINE 好友（${AppConfig.lineOfficialId}），優惠通知一手掌握！',
+            '加入「磐石烤地瓜」LINE 好友（${line.officialId}），優惠通知一手掌握！',
             style: const TextStyle(color: AppTheme.clay, height: 1.5),
           ),
           const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: () => _openLine(context),
+              onPressed: () =>
+                  _openLine(context, line.addFriendUrl, line.officialId),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF06C755),
               ),
@@ -609,10 +610,9 @@ class _LineSection extends StatelessWidget {
 }
 
 class _ContactFooter extends StatelessWidget {
-  const _ContactFooter();
-
   @override
   Widget build(BuildContext context) {
+    final shop = context.watch<SettingsProvider>().settings.shop;
     return Container(
       margin: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       padding: const EdgeInsets.all(20),
@@ -628,13 +628,13 @@ class _ContactFooter extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 12),
-          const _ContactRow(icon: Icons.phone, text: AppConfig.shopPhone),
-          const _ContactRow(icon: Icons.email_outlined, text: AppConfig.shopEmail),
-          const _ContactRow(
-              icon: Icons.location_on_outlined, text: AppConfig.shopAddress),
+          _ContactRow(icon: Icons.phone, text: shop.phone),
+          _ContactRow(icon: Icons.email_outlined, text: shop.email),
+          _ContactRow(
+              icon: Icons.location_on_outlined, text: shop.address),
           const SizedBox(height: 16),
           Text(
-            '© 2026 ${AppConfig.shopName} 版權所有',
+            '© 2026 ${shop.name} 版權所有',
             style: const TextStyle(color: AppTheme.clay, fontSize: 12),
           ),
         ],

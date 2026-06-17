@@ -11,6 +11,7 @@ const {
 } = require('../utils/orderPersistence');
 const { sendLineOrderNotifications } = require('../utils/lineNotifier');
 const { requireAdminAuth } = require('../middleware/requireAdminAuth');
+const { getSiteSettings } = require('../utils/siteSettings');
 
 const router = express.Router();
 
@@ -30,15 +31,22 @@ function generateOrderNumber() {
 }
 
 /**
- * 運費計算：滿 1000 免運，否則運費 150
+ * 運費計算：依店家設定（指定商品關鍵字滿門檻數量免運，否則收取運費）。
  */
-function calculateShipping(orderItems) {
-  const sweetPotatoQty = Array.isArray(orderItems)
+function calculateShipping(orderItems, shippingSettings) {
+  const fee = Number(shippingSettings?.fee ?? 150);
+  const thresholdQty = Number(shippingSettings?.freeThresholdQty ?? 20);
+  const keyword = String(shippingSettings?.freeThresholdKeyword ?? '黃金地瓜');
+
+  // 門檻數量 <= 0 代表全站免運
+  if (thresholdQty <= 0) return 0;
+
+  const qualifyingQty = Array.isArray(orderItems)
     ? orderItems
-      .filter((item) => String(item.name || '').includes('黃金地瓜'))
+      .filter((item) => keyword === '' || String(item.name || '').includes(keyword))
       .reduce((sum, item) => sum + Number(item.quantity || 0), 0)
     : 0;
-  return sweetPotatoQty >= 20 ? 0 : 150;
+  return qualifyingQty >= thresholdQty ? 0 : fee;
 }
 
 function normalizeProductName(name) {
@@ -484,8 +492,9 @@ router.post('/', async (req, res) => {
       });
     }
 
-    // --- 計算運費與總金額 ---
-    const shipping = calculateShipping(orderItems);
+    // --- 計算運費與總金額（依店家設定的運費規則） ---
+    const siteSettings = await getSiteSettings(req.app);
+    const shipping = calculateShipping(orderItems, siteSettings.shipping);
     const total = subtotal + shipping;
 
     // --- 金額驗證：totalAmount 與後端計算一致（若前端有提供才驗證） ---

@@ -7,6 +7,7 @@ import '../models/cart_item.dart';
 import '../models/customer_info.dart';
 import '../models/order_result.dart';
 import '../models/product.dart';
+import '../models/site_settings.dart';
 
 /// API 例外，攜帶可顯示給使用者的訊息。
 class ApiException implements Exception {
@@ -115,6 +116,25 @@ class ApiService {
       rethrow;
     } catch (_) {
       throw ApiException('無法連線伺服器，請稍後再試');
+    }
+  }
+
+  /// 取得店家設定（聯絡方式 / LINE / 運費 / 文案）。
+  /// 失敗時回傳內建預設值，確保 App 仍可正常顯示。
+  Future<SiteSettings> fetchSiteSettings() async {
+    try {
+      final res =
+          await _client.get(_uri('/api/site-settings')).timeout(_timeout);
+      final json = _decode(res);
+      if (res.statusCode == 200 && json['success'] == true) {
+        final data = json['data'];
+        if (data is Map<String, dynamic>) {
+          return SiteSettings.fromJson(data);
+        }
+      }
+      return SiteSettings.defaults;
+    } catch (_) {
+      return SiteSettings.defaults;
     }
   }
 

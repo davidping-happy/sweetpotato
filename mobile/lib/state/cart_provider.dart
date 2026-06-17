@@ -1,12 +1,23 @@
 import 'package:flutter/foundation.dart';
 
-import '../config/app_config.dart';
 import '../models/cart_item.dart';
 import '../models/product.dart';
+import '../models/site_settings.dart';
 
-/// 購物車狀態。運費規則與後端一致（黃金地瓜滿 20 盒免運）。
+/// 購物車狀態。運費規則由後端設定動態決定（與後端一致），
+/// 預設值與後端預設相同；店家於後台調整後，App 會同步套用。
 class CartProvider extends ChangeNotifier {
   final List<CartItem> _items = [];
+
+  ShippingRule _shippingRule = SiteSettings.defaults.shipping;
+
+  ShippingRule get shippingRule => _shippingRule;
+
+  /// 套用最新的運費規則（由 SettingsProvider 載入後呼叫）。
+  void configureShipping(ShippingRule rule) {
+    _shippingRule = rule;
+    notifyListeners();
+  }
 
   List<CartItem> get items => List.unmodifiable(_items);
 
@@ -16,14 +27,21 @@ class CartProvider extends ChangeNotifier {
 
   int get subtotal => _items.fold(0, (sum, i) => sum + i.lineTotal);
 
-  int get sweetPotatoQty => _items
-      .where((i) => i.product.name.contains('黃金地瓜'))
-      .fold(0, (sum, i) => sum + i.qty);
+  int get freeShippingThresholdQty => _shippingRule.freeThresholdQty;
 
-  int get shipping =>
-      sweetPotatoQty >= AppConfig.freeShippingSweetPotatoQty
-          ? 0
-          : AppConfig.shippingFee;
+  /// 計入免運門檻的商品數量（名稱包含關鍵字者；關鍵字為空代表全部商品）。
+  int get sweetPotatoQty {
+    final keyword = _shippingRule.freeThresholdKeyword;
+    return _items
+        .where((i) => keyword.isEmpty || i.product.name.contains(keyword))
+        .fold(0, (sum, i) => sum + i.qty);
+  }
+
+  int get shipping {
+    final threshold = _shippingRule.freeThresholdQty;
+    if (threshold <= 0) return 0;
+    return sweetPotatoQty >= threshold ? 0 : _shippingRule.fee;
+  }
 
   int get total => subtotal + shipping;
 
