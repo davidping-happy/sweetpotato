@@ -45,6 +45,11 @@ services:
         value: https://sweetpotato-api.onrender.com/api/line/login/callback
       - key: LINE_NOTIFY_WEBHOOK_URL
         sync: false
-      # Optional: set this in Render dashboard if using MongoDB Atlas
-      # - key: MONGODB_URI
-      #   value: mongodb+srv://<username>:<password>@<cluster>/<db>
+      # 允許跨來源的前端網域（逗號分隔）。GitHub Pages 前台需要它才能呼叫此 API。
+      - key: ALLOWED_ORIGINS
+        value: https://davidping-happy.github.io
+      # ⚠️ 重要：Render 檔案系統為 ephemeral（重啟/重新部署會清空 data/）。
+      # 必須設定 MongoDB Atlas 連線字串，訂單 / 管理員密碼 / 商品 / 店家設定才會永久保存。
+      # 於 Render Dashboard → Environment 填入實際連線字串（不要提交到 git）。
+      - key: MONGODB_URI
+        sync: false

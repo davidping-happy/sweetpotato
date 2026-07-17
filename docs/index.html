@@ -203,16 +203,31 @@
             <!-- Checkout Form (initially hidden) -->
             <div id="checkout-form-wrapper" style="display:none;" class="mb-4 space-y-3">
                 <h4 class="font-bold text-secondary text-sm mb-1">寄送資訊</h4>
-                <input id="cust-name" type="text" placeholder="姓名 *" class="w-full border border-outline/30 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
-                <input id="cust-phone" type="tel" placeholder="電話 *" class="w-full border border-outline/30 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
-                <input id="cust-email" type="email" placeholder="Email（選填）" class="w-full border border-outline/30 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
-                <input id="cust-address" type="text" placeholder="寄送地址 *" class="w-full border border-outline/30 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
+                <div>
+                    <label for="cust-name" class="block text-xs font-bold text-secondary/80 mb-1">姓名 <span class="text-primary">*</span></label>
+                    <input id="cust-name" type="text" required aria-required="true" autocomplete="name" placeholder="例：王小明" class="w-full border border-outline/30 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
+                </div>
+                <div>
+                    <label for="cust-phone" class="block text-xs font-bold text-secondary/80 mb-1">電話 <span class="text-primary">*</span></label>
+                    <input id="cust-phone" type="tel" required aria-required="true" autocomplete="tel" inputmode="tel" placeholder="例：0912345678" class="w-full border border-outline/30 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
+                </div>
+                <div>
+                    <label for="cust-email" class="block text-xs font-bold text-secondary/80 mb-1">Email（選填）</label>
+                    <input id="cust-email" type="email" autocomplete="email" placeholder="you@example.com" class="w-full border border-outline/30 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
+                </div>
+                <div>
+                    <label for="cust-address" class="block text-xs font-bold text-secondary/80 mb-1">寄送地址 <span class="text-primary">*</span></label>
+                    <input id="cust-address" type="text" required aria-required="true" autocomplete="street-address" placeholder="例：高雄市左營區華夏路 576 號" class="w-full border border-outline/30 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40" />
+                </div>
+                <div>
+                    <label for="notify-preference" class="block text-xs font-bold text-secondary/80 mb-1">通知方式</label>
                 <select id="notify-preference" class="w-full border border-outline/30 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40">
                     <option value="email">Email 確認信（寄到您的信箱）</option>
                     <option value="line">僅通知店家 LINE（新訂單提醒）</option>
                     <option value="both" selected>Email + 我的 LINE 都通知</option>
                     <option value="none">不通知</option>
                 </select>
+                </div>
                 <input id="cust-line-user-id" type="hidden" value="" />
                 <p id="checkout-line-hint" class="text-xs text-secondary/80" style="display:none;"></p>
                 <p id="checkout-validation" class="text-xs text-red-600"></p>
@@ -429,7 +444,8 @@
                     <h3 class="font-headline text-3xl md:text-4xl font-bold text-white mb-6">接收阿嬤的溫暖報</h3>
                     <p class="text-white/80 text-lg mb-8">訂閱電子報，第一時間獲得季節新品資訊與專屬會員優惠。</p>
                     <form class="flex flex-col sm:flex-row gap-3" id="newsletter-form">
-                        <input class="flex-1 bg-white/10 border border-white/20 rounded-xl px-6 py-4 text-white placeholder:text-white/60 focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm" placeholder="您的電子郵件地址" type="email" id="newsletter-email" required />
+                        <label for="newsletter-email" class="sr-only">電子郵件地址</label>
+                    <input class="flex-1 bg-white/10 border border-white/20 rounded-xl px-6 py-4 text-white placeholder:text-white/60 focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm" placeholder="您的電子郵件地址" type="email" id="newsletter-email" autocomplete="email" required />
                         <button type="submit" id="newsletter-submit-btn" class="bg-primary text-white font-extrabold px-8 py-4 rounded-xl hover:brightness-110 transition-all active:scale-95 shadow-lg">
                             立即訂閱
                         </button>

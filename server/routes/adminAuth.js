@@ -1,5 +1,6 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
+const rateLimit = require('express-rate-limit');
 const { requireAdminAuth } = require('../middleware/requireAdminAuth');
 const {
   getAdminEmail,
@@ -12,6 +13,15 @@ const { sendAdminPasswordResetEmail } = require('../utils/mailer');
 const router = express.Router();
 
 const ADMIN_JWT_SECRET = String(process.env.ADMIN_JWT_SECRET || '').trim();
+
+// 登入 / 忘記密碼：限制嘗試次數，降低暴力破解與濫用風險。
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 分鐘
+  max: 10, // 每個 IP 15 分鐘內最多 10 次
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: '嘗試次數過多，請 15 分鐘後再試' },
+});
 
 function hasJwtConfig() {
   return Boolean(ADMIN_JWT_SECRET);
@@ -31,7 +41,7 @@ function buildResetUrl(req, rawToken) {
   return base ? `${base}${path}` : path;
 }
 
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   if (!hasAdminConfig()) {
     return res.status(500).json({
       success: false,
@@ -63,7 +73,7 @@ router.post('/login', async (req, res) => {
   });
 });
 
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', authLimiter, async (req, res) => {
   if (!hasAdminConfig()) {
     return res.status(500).json({
       success: false,
@@ -95,7 +105,7 @@ router.post('/forgot-password', async (req, res) => {
   return res.json({ success: true, message: genericMessage });
 });
 
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', authLimiter, async (req, res) => {
   if (!hasJwtConfig()) {
     return res.status(500).json({
       success: false,
