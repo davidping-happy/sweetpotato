@@ -1,0 +1,13 @@
+# 正式簽章設定範本 —— 複製成同目錄的 key.properties 後填入你自己的值。
+# ⚠️ key.properties 與 .jks 金鑰檔都「不會」進 git（已列入 .gitignore）。
+# ⚠️ 金鑰檔與這裡的四個密碼請務必備份！遺失將無法再更新已上架的 App。
+#
+# 產生金鑰（在 mobile/android/app/ 目錄執行；password 自訂並牢記）：
+#   keytool -genkey -v -keystore upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+#
+# 產生後把下面四個值填好：
+storePassword=你設定的keystore密碼
+keyPassword=你設定的key密碼
+keyAlias=upload
+# storeFile 相對於 mobile/android/app/ 目錄；若照上面指令產生就是這個檔名。
+storeFile=upload-keystore.jks
