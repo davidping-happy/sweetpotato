@@ -5,6 +5,18 @@
 const IMAGE_CDN_BASE = 'https://cdn.jsdelivr.net/gh/davidping-happy/sweetpotato@main/';
 const SWEET_POTATO_CANDY_IMAGE = `${IMAGE_CDN_BASE}photo/005.png?v=20260520`;
 
+// 圖片版本號：更換任何商品圖後把日期往後改（例如 20260718），
+// 前端會在本站 CDN 圖片網址加上 ?v=，強制瀏覽器 / 手機重新下載，避免顯示舊圖快取。
+const ASSET_VERSION = '20260718';
+
+function withAssetVersion(url) {
+    if (!url || !url.includes('cdn.jsdelivr.net')) return url;
+    const [base, query = ''] = url.split('?');
+    const params = new URLSearchParams(query);
+    params.set('v', ASSET_VERSION);
+    return `${base}?${params.toString()}`;
+}
+
 function normalizeImagePath(path) {
     if (!path || typeof path !== 'string') return '';
     if (path.startsWith('http://') || path.startsWith('https://')) return path;
@@ -26,12 +38,12 @@ function escHtml(s) {
 }
 
 function productImageUrl(product) {
-    if (product && product.imageUrl) return normalizeImagePath(product.imageUrl);
+    if (product && product.imageUrl) return withAssetVersion(normalizeImagePath(product.imageUrl));
     // 沒有圖片時，依分類給預設圖
     const cat = String(product?.category || '');
-    if (cat.includes('蛋')) return `${IMAGE_CDN_BASE}photo/004.png`;
-    if (cat.includes('零食')) return SWEET_POTATO_CANDY_IMAGE;
-    return `${IMAGE_CDN_BASE}photo/002.jpg`;
+    if (cat.includes('蛋')) return withAssetVersion(`${IMAGE_CDN_BASE}photo/004.png`);
+    if (cat.includes('零食')) return withAssetVersion(SWEET_POTATO_CANDY_IMAGE);
+    return withAssetVersion(`${IMAGE_CDN_BASE}photo/002.jpg`);
 }
 
 function badgeFor(name) {
